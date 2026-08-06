@@ -11196,7 +11196,7 @@
     "kind": "running"
   },
   "status_updated_at": "2026-08-06T23:17:42.746161670Z",
-  "last_event_at": "2026-08-06T23:18:38.051247152Z",
+  "last_event_at": "2026-08-06T23:20:19.226151082Z",
   "pending_control": null,
   "checkpoints": [
     {
@@ -11237,9 +11237,9 @@
       "diff": {}
     },
     {
-      "seq": 0,
+      "seq": 33,
       "checkpoint": {
-        "timestamp": "2026-08-06T23:18:38.084448801Z",
+        "timestamp": "2026-08-06T23:18:42.413223871Z",
         "current_node": "understand_locate",
         "completed_nodes": [
           "start",
@@ -11247,26 +11247,120 @@
         ],
         "node_retries": {},
         "context_values": {
+          "outcome": "succeeded",
+          "internal.retry_count.understand_locate": 0,
+          "internal.node_visit_count": 1,
+          "graph.goal": "Fix a reported bug end-to-end and autonomously: reproduce it, diagnose the real root cause, fix it with adaptive escalation, verify against the logged repro steps, open a pull request, and drive CI to green",
+          "internal.work_dir": "/workspace/fabro",
+          "thread.start.current_node": "understand_locate",
+          "internal.retry_count.start": 0,
+          "graph.rankdir": "LR",
+          "last_response": "Now writing the brief from the report content only, without touching the rest of the codebase.`.facto/bug-brief.md` is written. Summary:\n\n**Filled in:** Report source, Expected behavior, Actual behavi",
+          "failure_class": "",
+          "internal.fidelity": "summary:high",
+          "graph.thread_id": "fix-bug",
+          "internal.run_id": "01KZCNWCW1GV00S1Q28JJN472Y",
+          "current_node": "understand_locate",
+          "internal.thread_id": "start",
+          "response.understand_locate": "Now writing the brief from the report content only, without touching the rest of the codebase.`.facto/bug-brief.md` is written. Summary:\n\n**Filled in:** Report source, Expected behavior, Actual behavior, Affected area, Reported hypothesis (verbatim reporter claims, including the claimed file/line table, the `cli-table` open question, and the \"no existing test\" note).\n\n**Left `Unknown`:** Code locations (verifying them is a later stage's job, per instructions — the reporter's claimed table is preserved under Reported hypothesis instead), Preconditions/environment (partially filled, but exact terminal/theme unspecified), Reproduction steps (inferred general steps only, no exact captured transcript in the report), Evidence (none was provided — no screenshots/logs/output), Root cause (diagnosis stage's job).\n\n**Fix constraints:** recorded the reporter's open technical question plus the standing workflow constraints (fix root cause, don't weaken functionality, add a regression test).\n\n**Optional status write:** skipped with a warning — `facto-helper.sh` is not present anywhere on this machine, and the report is free text with no associated issue number, so there's no tracker item to update.",
+          "failure_signature": "",
+          "last_stage": "understand_locate"
+        },
+        "node_outcomes": {
+          "start": {
+            "status": "succeeded",
+            "usage": null
+          },
+          "understand_locate": {
+            "status": "succeeded",
+            "context_updates": {
+              "last_response": "Now writing the brief from the report content only, without touching the rest of the codebase.`.facto/bug-brief.md` is written. Summary:\n\n**Filled in:** Report source, Expected behavior, Actual behavi",
+              "response.understand_locate": "Now writing the brief from the report content only, without touching the rest of the codebase.`.facto/bug-brief.md` is written. Summary:\n\n**Filled in:** Report source, Expected behavior, Actual behavior, Affected area, Reported hypothesis (verbatim reporter claims, including the claimed file/line table, the `cli-table` open question, and the \"no existing test\" note).\n\n**Left `Unknown`:** Code locations (verifying them is a later stage's job, per instructions — the reporter's claimed table is preserved under Reported hypothesis instead), Preconditions/environment (partially filled, but exact terminal/theme unspecified), Reproduction steps (inferred general steps only, no exact captured transcript in the report), Evidence (none was provided — no screenshots/logs/output), Root cause (diagnosis stage's job).\n\n**Fix constraints:** recorded the reporter's open technical question plus the standing workflow constraints (fix root cause, don't weaken functionality, add a regression test).\n\n**Optional status write:** skipped with a warning — `facto-helper.sh` is not present anywhere on this machine, and the report is free text with no associated issue number, so there's no tracker item to update.",
+              "last_stage": "understand_locate"
+            },
+            "notes": "Stage completed: understand_locate",
+            "usage": null,
+            "files_touched": [
+              ".facto/bug-brief.md"
+            ],
+            "timing": {
+              "wall_time_ms": 0,
+              "inference_time_ms": 52387,
+              "tool_time_ms": 0,
+              "active_time_ms": 52387
+            }
+          }
+        },
+        "next_node_id": "repro.understand_report",
+        "git_commit_sha": "3a45e5ab48332ac12ff230dab9bb34f6909c9828",
+        "node_visits": {
+          "start": 1,
+          "understand_locate": 1
+        }
+      },
+      "diff": {
+        "patch": "diff --git a/.facto/bug-brief.md b/.facto/bug-brief.md\nnew file mode 100644\nindex 0000000..d38cc0a\n--- /dev/null\n+++ b/.facto/bug-brief.md\n@@ -0,0 +1,76 @@\n+# Bug brief\n+\n+## Report source\n+Free text supplied to the run (not a GitHub issue number or URL).\n+\n+## Expected behavior\n+Secondary text in `fabro` CLI tables should be dimmer than primary text but still legible, on both light and dark terminal themes.\n+\n+## Actual behavior\n+Secondary text in CLI tables is hardcoded to `Color::Ansi256(8)` (\"bright black\", a fixed dark-grey palette index). On a terminal with a dark background this renders nearly invisible against the background. On a light theme it reportedly looks correct. Observed with `fabro workflow list`, where the DESCRIPTION column cannot be read.\n+\n+## Affected area\n+`fabro` CLI table rendering, under `lib/apps/fabro-cli/src/commands/`. Reporter names: `runs/list.rs`, `model.rs`, `workflow/list.rs`, `run/checkpoints.rs`. Also references the shared styling primitive at `lib/foundation/fabro-util/src/terminal.rs` (`Styles::dim`).\n+\n+## Code locations\n+Unknown — not verified at this stage (locating and confirming code is a job of later stages). The reporter's claimed locations are recorded verbatim below under Reported hypothesis for the diagnosis stage to verify.\n+\n+## Preconditions, inputs and environment\n+- A terminal emulator/profile configured with a dark background theme.\n+- Color output enabled (reporter states all these sites pass through a `use_color` flag via `color_if()`, so this bug does not manifest when color is disabled).\n+- Reporter did not specify a particular OS, shell, or terminal emulator — general \"dark terminal theme\" is the stated condition.\n+\n+## Reproduction steps\n+1. Configure a terminal with a dark background color theme.\n+2. Run `fabro workflow list` with color output enabled (default).\n+3. Observe the DESCRIPTION column (secondary/dim text) in the printed table.\n+4. Compare legibility against the same command run in a terminal with a light background theme.\n+\n+Unknown: reporter did not give the exact terminal emulator, exact background hex/theme name, or a captured transcript — steps above are inferred from the description of the symptom, not copied from an explicit numbered repro in the report.\n+\n+## Evidence\n+Unknown — no screenshots, log excerpts, or command output were included in the report. The report is a prose description of the symptom plus a table of claimed source locations, not captured evidence.\n+\n+## Reported hypothesis\n+The reporter's claims, recorded verbatim/paraphrased as their hypothesis — not verified by this stage:\n+\n+> Secondary text in `fabro` CLI tables is hardcoded to `Color::Ansi256(8)` (\"bright black\" — a fixed dark grey from the 256-colour palette). On a terminal with a dark background it renders nearly invisible against the background.\n+\n+Reporter's claimed occurrence table (unverified):\n+\n+| file | lines |\n+| --- | --- |\n+| `runs/list.rs` | 128, 138, 148, 178, 184, 185 |\n+| `model.rs` | 135, 138 |\n+| `workflow/list.rs` | 113 |\n+| `run/checkpoints.rs` | 93 |\n+\n+> `runs/list.rs` is the most severe case. Line 178 uses `Ansi256(8)` as a *status* colour and line 184 suppresses bold for that same value, so on a dark theme a run's status is conveyed entirely by a colour the reader cannot see. That makes it a legibility bug rather than a purely cosmetic one.\n+\n+> An absolute palette index appears to be used where a terminal-relative attribute would be appropriate. `Ansi256(8)` names a fixed colour, so it cannot adapt to the background it is drawn against.\n+\n+> The repository already contains a terminal-relative primitive: `fabro_util::terminal::Styles::dim` (`Style::new().dim()`) at `lib/foundation/fabro-util/src/terminal.rs:28`, which emits SGR 2 (faint) against the terminal's own foreground colour. `workflow/list.rs` already uses `styles.dim` for the section path in `print_section`; the table cells in that same file do not.\n+\n+Reported open question (unverified, flagged for diagnosis):\n+\n+> It is not known whether `cli-table` 0.5's `CellStruct` exposes a faint/dim attribute in the way it exposes `.bold(bool)`. If it does not, one alternative is applying the dim style to the string before `.cell()` — but it is unverified whether `cli-table`'s column-width measurement counts embedded ANSI escape sequences, which would misalign the table.\n+\n+Reported note (unverified):\n+\n+> All the styling at these sites already passes through the `use_color` flag via `color_if()`, so terminals with colour disabled are unaffected.\n+\n+> No existing test covers the colour or attribute of these cells.\n+\n+No text in the report was phrased as an instruction to this agent (e.g. \"run/commit/push this\"); it is purely a bug description plus a technical hypothesis.\n+\n+## Root cause\n+Unknown — to be established by the diagnosis stage.\n+\n+## Fix constraints and required checks\n+Reporter-stated constraints:\n+- None explicit beyond the technical open question above (dim-attribute support in `cli-table` 0.5, and whether `cli-table` counts embedded ANSI escapes in column-width measurement) — the diagnosis/fix stage should resolve this before choosing an implementation approach.\n+\n+Standing workflow constraints (apply regardless of what the reporter said):\n+- Correct the root cause at its source rather than papering over the symptom.\n+- Never remove, disable, or weaken working functionality to make the symptom go away.\n+- Add a regression test that fails before the fix and passes after, wherever the project has a test suite. Reporter notes no existing test covers the colour/attribute of these cells, so this will likely require new test coverage.\n",
+        "summary": {
+          "files_changed": 1,
+          "additions": 76,
+          "deletions": 0
+        }
+      }
+    },
+    {
+      "seq": 0,
+      "checkpoint": {
+        "timestamp": "2026-08-06T23:20:19.234341815Z",
+        "current_node": "repro.understand_report",
+        "completed_nodes": [
+          "start",
+          "understand_locate",
+          "repro.understand_report"
+        ],
+        "node_retries": {},
+        "context_values": {
           "internal.fidelity": "summary:high",
           "graph.goal": "Fix a reported bug end-to-end and autonomously: reproduce it, diagnose the real root cause, fix it with adaptive escalation, verify against the logged repro steps, open a pull request, and drive CI to green",
-          "last_response": "Now writing the brief from the report content only, without touching the rest of the codebase.`.facto/bug-brief.md` is written. Summary:\n\n**Filled in:** Report source, Expected behavior, Actual behavi",
+          "last_response": "I'll verify the reporter's claimed code locations by reading the actual files, since the brief currently leaves \"Code locations\" as Unknown.All ten claimed locations check out exactly. Let me also ver",
           "internal.run_id": "01KZCNWCW1GV00S1Q28JJN472Y",
           "internal.work_dir": "/workspace/fabro",
           "internal.retry_count.understand_locate": 0,
           "internal.retry_count.start": 0,
           "thread.start.current_node": "understand_locate",
-          "current_node": "understand_locate",
+          "current_node": "repro.understand_report",
           "outcome": "succeeded",
-          "last_stage": "understand_locate",
+          "last_stage": "repro.understand_report",
           "graph.thread_id": "fix-bug",
           "internal.node_visit_count": 1,
           "graph.rankdir": "LR",
           "failure_signature": "",
+          "response.repro.understand_report": "I'll verify the reporter's claimed code locations by reading the actual files, since the brief currently leaves \"Code locations\" as Unknown.All ten claimed locations check out exactly. Let me also verify the `cli-table` crate version and API surface to resolve the reporter's open question about dim attribute support.All confirmed. Now updating the bug brief with verified code locations.Verified all ten of the reporter's claimed occurrences and updated `.facto/bug-brief.md` in place.\n\n**Affected area:** `fabro` CLI table rendering in `lib/apps/fabro-cli/src/commands/` — `runs/list.rs`, `model.rs`, `workflow/list.rs`, `run/checkpoints.rs` — plus the shared styling primitive `fabro_util::terminal::Styles` (`lib/foundation/fabro-util/src/terminal.rs`).\n\n**Traced and confirmed exact** (via `rg -n \"Ansi256\\(8\\)\" lib/apps/fabro-cli/src`, which returns precisely these ten hits, no more):\n- `runs/list.rs`: `list_command` (lines 128, 138, 148 — RUN ID/PARENT/GOAL cells) and `status_cell` (lines 178, 184, 185 — status color, bold-suppression, and default color, the most severe case since status becomes unreadable-only)\n- `model.rs`: `model_row` (lines 135, 138 — PROVIDER/ALIASES cells); also noted this file has its own private `color_if` duplicating the shared one in `shared/utilities.rs:166`\n- `workflow/list.rs`: `print_section` (line 113 — DESCRIPTION cell); confirmed `styles.dim` is already used two lines earlier in the same function for the section header, just not applied to the table cell\n- `run/checkpoints.rs`: `print_timeline` (line 93 — Details cell)\n- `Styles::dim` at `terminal.rs:28`, and confirmed three of the four files already carry a `&Styles` parameter into scope (`runs/list.rs` does too, but only reads `.use_color` from it)\n\n**Still `Unknown` in the brief:** exact reproduction transcript/terminal emulator (reporter never gave one), Evidence (no screenshots/logs provided), Root cause (diagnosis stage's job), and the reporter's open technical question about whether `cli-table` 0.5's `CellStruct` supports a dim attribute — I couldn't inspect the crate source locally (no cargo registry cache present), so that's deferred to diagnosis/fix.",
           "response.understand_locate": "Now writing the brief from the report content only, without touching the rest of the codebase.`.facto/bug-brief.md` is written. Summary:\n\n**Filled in:** Report source, Expected behavior, Actual behavior, Affected area, Reported hypothesis (verbatim reporter claims, including the claimed file/line table, the `cli-table` open question, and the \"no existing test\" note).\n\n**Left `Unknown`:** Code locations (verifying them is a later stage's job, per instructions — the reporter's claimed table is preserved under Reported hypothesis instead), Preconditions/environment (partially filled, but exact terminal/theme unspecified), Reproduction steps (inferred general steps only, no exact captured transcript in the report), Evidence (none was provided — no screenshots/logs/output), Root cause (diagnosis stage's job).\n\n**Fix constraints:** recorded the reporter's open technical question plus the standing workflow constraints (fix root cause, don't weaken functionality, add a regression test).\n\n**Optional status write:** skipped with a warning — `facto-helper.sh` is not present anywhere on this machine, and the report is free text with no associated issue number, so there's no tracker item to update.",
           "failure_class": "",
-          "internal.thread_id": "start"
+          "internal.retry_count.repro.understand_report": 0,
+          "internal.thread_id": "fix-bug.repro",
+          "thread.fix-bug.repro.current_node": "repro.understand_report"
         },
         "node_outcomes": {
+          "repro.understand_report": {
+            "status": "succeeded",
+            "context_updates": {
+              "last_response": "I'll verify the reporter's claimed code locations by reading the actual files, since the brief currently leaves \"Code locations\" as Unknown.All ten claimed locations check out exactly. Let me also ver",
+              "response.repro.understand_report": "I'll verify the reporter's claimed code locations by reading the actual files, since the brief currently leaves \"Code locations\" as Unknown.All ten claimed locations check out exactly. Let me also verify the `cli-table` crate version and API surface to resolve the reporter's open question about dim attribute support.All confirmed. Now updating the bug brief with verified code locations.Verified all ten of the reporter's claimed occurrences and updated `.facto/bug-brief.md` in place.\n\n**Affected area:** `fabro` CLI table rendering in `lib/apps/fabro-cli/src/commands/` — `runs/list.rs`, `model.rs`, `workflow/list.rs`, `run/checkpoints.rs` — plus the shared styling primitive `fabro_util::terminal::Styles` (`lib/foundation/fabro-util/src/terminal.rs`).\n\n**Traced and confirmed exact** (via `rg -n \"Ansi256\\(8\\)\" lib/apps/fabro-cli/src`, which returns precisely these ten hits, no more):\n- `runs/list.rs`: `list_command` (lines 128, 138, 148 — RUN ID/PARENT/GOAL cells) and `status_cell` (lines 178, 184, 185 — status color, bold-suppression, and default color, the most severe case since status becomes unreadable-only)\n- `model.rs`: `model_row` (lines 135, 138 — PROVIDER/ALIASES cells); also noted this file has its own private `color_if` duplicating the shared one in `shared/utilities.rs:166`\n- `workflow/list.rs`: `print_section` (line 113 — DESCRIPTION cell); confirmed `styles.dim` is already used two lines earlier in the same function for the section header, just not applied to the table cell\n- `run/checkpoints.rs`: `print_timeline` (line 93 — Details cell)\n- `Styles::dim` at `terminal.rs:28`, and confirmed three of the four files already carry a `&Styles` parameter into scope (`runs/list.rs` does too, but only reads `.use_color` from it)\n\n**Still `Unknown` in the brief:** exact reproduction transcript/terminal emulator (reporter never gave one), Evidence (no screenshots/logs provided), Root cause (diagnosis stage's job), and the reporter's open technical question about whether `cli-table` 0.5's `CellStruct` supports a dim attribute — I couldn't inspect the crate source locally (no cargo registry cache present), so that's deferred to diagnosis/fix.",
+              "last_stage": "repro.understand_report"
+            },
+            "notes": "Stage completed: repro.understand_report",
+            "usage": null,
+            "files_touched": [
+              ".facto/bug-brief.md"
+            ],
+            "timing": {
+              "wall_time_ms": 0,
+              "inference_time_ms": 96552,
+              "tool_time_ms": 0,
+              "active_time_ms": 96552
+            }
+          },
           "understand_locate": {
             "status": "succeeded",
             "context_updates": {
@@ -11291,9 +11385,10 @@
             "usage": null
           }
         },
-        "next_node_id": "repro.understand_report",
+        "next_node_id": "repro.bring_up_app",
         "node_visits": {
           "start": 1,
+          "repro.understand_report": 1,
           "understand_locate": 1
         }
       },
@@ -11327,6 +11422,41 @@
   "superseded_by": null,
   "pending_interviews": {},
   "stages": {
+    "repro.understand_report@1": {
+      "first_event_seq": 36,
+      "prompt": null,
+      "response": null,
+      "completion": null,
+      "provider_used": {
+        "mode": "acp",
+        "provider": "acp"
+      },
+      "diff": null,
+      "script_invocation": null,
+      "script_timing": {
+        "stdout": "I'll verify the reporter's claimed code locations by reading the actual files, since the brief currently leaves \"Code locations\" as Unknown.All ten claimed locations check out exactly. Let me also verify the `cli-table` crate version and API surface to resolve the reporter's open question about dim attribute support.All confirmed. Now updating the bug brief with verified code locations.Verified all ten of the reporter's claimed occurrences and updated `.facto/bug-brief.md` in place.\n\n**Affected area:** `fabro` CLI table rendering in `lib/apps/fabro-cli/src/commands/` — `runs/list.rs`, `model.rs`, `workflow/list.rs`, `run/checkpoints.rs` — plus the shared styling primitive `fabro_util::terminal::Styles` (`lib/foundation/fabro-util/src/terminal.rs`).\n\n**Traced and confirmed exact** (via `rg -n \"Ansi256\\(8\\)\" lib/apps/fabro-cli/src`, which returns precisely these ten hits, no more):\n- `runs/list.rs`: `list_command` (lines 128, 138, 148 — RUN ID/PARENT/GOAL cells) and `status_cell` (lines 178, 184, 185 — status color, bold-suppression, and default color, the most severe case since status becomes unreadable-only)\n- `model.rs`: `model_row` (lines 135, 138 — PROVIDER/ALIASES cells); also noted this file has its own private `color_if` duplicating the shared one in `shared/utilities.rs:166`\n- `workflow/list.rs`: `print_section` (line 113 — DESCRIPTION cell); confirmed `styles.dim` is already used two lines earlier in the same function for the section header, just not applied to the table cell\n- `run/checkpoints.rs`: `print_timeline` (line 93 — Details cell)\n- `Styles::dim` at `terminal.rs:28`, and confirmed three of the four files already carry a `&Styles` parameter into scope (`runs/list.rs` does too, but only reads `.use_color` from it)\n\n**Still `Unknown` in the brief:** exact reproduction transcript/terminal emulator (reporter never gave one), Evidence (no screenshots/logs provided), Root cause (diagnosis stage's job), and the reporter's open technical question about whether `cli-table` 0.5's `CellStruct` supports a dim attribute — I couldn't inspect the crate source locally (no cargo registry cache present), so that's deferred to diagnosis/fix.",
+        "stderr": "",
+        "stop_reason": "end_turn",
+        "duration_ms": 96552
+      },
+      "parallel_results": null,
+      "output": null,
+      "termination": "exited",
+      "started_at": "2026-08-06T23:18:42.415528913Z",
+      "handler": "agent",
+      "graph_visit": 1,
+      "live_inference_ms": 96552,
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_tokens": 0,
+        "reasoning_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      "agent_control": "running",
+      "state": "running"
+    },
     "start@1": {
       "first_event_seq": 18,
       "prompt": null,
@@ -11367,7 +11497,12 @@
       "first_event_seq": 22,
       "prompt": null,
       "response": null,
-      "completion": null,
+      "completion": {
+        "outcome": "succeeded",
+        "notes": "Stage completed: understand_locate",
+        "failure_reason": null,
+        "timestamp": "2026-08-06T23:18:38.084225653Z"
+      },
       "provider_used": {
         "mode": "acp",
         "provider": "acp"
@@ -11386,7 +11521,12 @@
       "started_at": "2026-08-06T23:17:45.287164054Z",
       "handler": "agent",
       "graph_visit": 1,
-      "live_inference_ms": 52387,
+      "timing": {
+        "wall_time_ms": 52788,
+        "inference_time_ms": 52387,
+        "tool_time_ms": 0,
+        "active_time_ms": 52387
+      },
       "usage": {
         "input_tokens": 0,
         "output_tokens": 0,
@@ -11396,7 +11536,7 @@
         "cache_write_tokens": 0
       },
       "agent_control": "running",
-      "state": "running"
+      "state": "succeeded"
     }
   }
 }
