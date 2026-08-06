@@ -1,0 +1,7 @@
+**Decision: ESCALATE**
+
+Triggering criterion: **"the fix touches more than about two files."** The diagnosis identified 10 occurrences of the bug across 4 files under `lib/apps/fabro-cli/src/commands/` (`runs/list.rs`, `model.rs`, `workflow/list.rs`, `run/checkpoints.rs`), all of which need the same `Ansi256(8)` → dim-attribute change applied. That's double the two-file direct-path ceiling before even counting the new regression test file(s) required by the verification step.
+
+No other criterion applies on its own — the change reuses the existing `fabro_util::terminal::Styles::dim` primitive rather than introducing a new abstraction, doesn't touch schema/API/migration, and isn't touching shared core logic beyond a primitive that already exists and is already used elsewhere (`workflow/list.rs`'s `print_section`). But file count alone crosses the escalation threshold.
+
+Ending this stage as **SUCCEEDED** (escalate).
