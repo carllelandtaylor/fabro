@@ -9739,14 +9739,114 @@
     }
   },
   "web_url": "http://127.0.0.1:32276/runs/01KZCASWWVN35FN33S9YXJ2R2C",
-  "start": null,
-  "status": {
-    "kind": "starting"
+  "start": {
+    "start_time": "2026-08-06T20:04:06.475899307Z",
+    "run_branch": "fabro/run/01KZCASWWVN35FN33S9YXJ2R2C",
+    "base_sha": "0abf2297c00a90013a93ae01c6c139b7b85b1b1f"
   },
-  "status_updated_at": "2026-08-06T20:04:01.153935175Z",
-  "last_event_at": "2026-08-06T20:04:05.828522144Z",
+  "status": {
+    "kind": "running"
+  },
+  "status_updated_at": "2026-08-06T20:04:06.475932218Z",
+  "last_event_at": "2026-08-06T20:05:30.071618518Z",
   "pending_control": null,
-  "checkpoints": [],
+  "checkpoints": [
+    {
+      "seq": 21,
+      "checkpoint": {
+        "timestamp": "2026-08-06T20:04:08.991138580Z",
+        "current_node": "start",
+        "completed_nodes": [
+          "start"
+        ],
+        "node_retries": {},
+        "context_values": {
+          "internal.fidelity": "compact",
+          "internal.node_visit_count": 1,
+          "outcome": "succeeded",
+          "internal.thread_id": null,
+          "failure_class": "",
+          "current_node": "start",
+          "failure_signature": "",
+          "graph.goal": "BUG: CLI table text is unreadable on dark terminal themes.\n\nSYMPTOM\nSecondary text in `fabro` CLI tables is hardcoded to `Color::Ansi256(8)` (\"bright\nblack\" — a fixed dark grey from the palette). That assumes a light terminal\nbackground; on a dark theme it renders nearly invisible against the background.\nReproduced by the user with `fabro workflow list`, where the DESCRIPTION column\nis unreadable.\n\nLOCATIONS — 10 occurrences in 4 files, all under\nlib/apps/fabro-cli/src/commands/\n  runs/list.rs         6  (lines 128, 138, 148, 178, 184, 185)\n  model.rs             2  (lines 135, 138)\n  workflow/list.rs     1  (line 113)\n  run/checkpoints.rs   1  (line 93)\n\nruns/list.rs is the worst case: line 178 uses Ansi256(8) as a *status* color and\nline 184 suppresses bold for it, so a run status is conveyed entirely by a color\nthe user cannot see. This is not purely cosmetic.\n\nSUSPECTED CAUSE\nAn absolute palette index is used where a terminal-relative attribute belongs.\nThe codebase already has the right primitive: `fabro_util::terminal::Styles::dim`\n= `Style::new().dim()` at lib/foundation/fabro-util/src/terminal.rs:28. It emits\nSGR 2 (faint) against the terminal's own foreground, so it adapts to the theme.\nworkflow/list.rs already uses `styles.dim` for the section path in\n`print_section` — the table cells in the same file just don't.\n\nOPEN QUESTION — resolve this before choosing the fix\nDoes cli-table 0.5's `CellStruct` expose a faint/dim attribute the way it exposes\n`.bold(bool)`? Check the actual crate source in the cargo registry rather than\nguessing. Three ways it can go:\n  a) If CellStruct has a faint/dim attribute, use it. Cleanest.\n  b) Otherwise pre-apply the dim style to the string before `.cell()`. Risk:\n     cli-table's column width measurement may count the embedded ANSI escape\n     codes and mis-align the table. Verify alignment if taking this path.\n  c) As a last resort pick a mid-tone color readable on both light and dark\n     backgrounds — but this still absolutizes what should be relative.\n\nNote all styling here already goes through the `use_color` flag via\n`color_if()`, so the no-color path is unaffected either way.\n\nCONTRIBUTION PATH\nPer CONTRIBUTING.md this qualifies as a \"bug fix / small improvement\" — send a\nPR directly, no issue needed. The `origin` remote is the fork\ncarllelandtaylor/fabro; `upstream` is fabro-sh/fabro and its push URL is\nDISABLED, so push branches to `origin` only. Branch from main and open the PR\nagainst fabro-sh/fabro main, e.g.\n\n  gh pr create --repo fabro-sh/fabro --base main --head carllelandtaylor:<branch>\n\nREQUIRED CHECKS (CONTRIBUTING.md's list is stale relative to CI — use these)\n  cargo nextest run --workspace\n  cargo +nightly-2026-04-14 fmt --check --all\n  cargo +nightly-2026-04-14 clippy --workspace --all-targets -- -D warnings\nThe pinned nightly matters: stable rustfmt will not match CI.\n\nVERIFICATION\nNo existing test covers this. Add one asserting the faint attribute (or whatever\nthe chosen mechanism emits) so this cannot regress. Manually verify the rendered\noutput against both a light and a dark terminal profile.\n",
+          "graph.rankdir": "LR",
+          "internal.run_id": "01KZCASWWVN35FN33S9YXJ2R2C",
+          "internal.work_dir": "/workspace/fabro",
+          "internal.retry_count.start": 0
+        },
+        "node_outcomes": {
+          "start": {
+            "status": "succeeded",
+            "usage": null
+          }
+        },
+        "next_node_id": "understand_locate",
+        "node_visits": {
+          "start": 1
+        }
+      },
+      "diff": {}
+    },
+    {
+      "seq": 0,
+      "checkpoint": {
+        "timestamp": "2026-08-06T20:05:30.081676445Z",
+        "current_node": "understand_locate",
+        "completed_nodes": [
+          "start",
+          "understand_locate"
+        ],
+        "node_retries": {},
+        "context_values": {
+          "internal.work_dir": "/workspace/fabro",
+          "current_node": "understand_locate",
+          "internal.retry_count.understand_locate": 0,
+          "internal.run_id": "01KZCASWWVN35FN33S9YXJ2R2C",
+          "failure_class": "",
+          "internal.node_visit_count": 1,
+          "failure_signature": "",
+          "graph.goal": "BUG: CLI table text is unreadable on dark terminal themes.\n\nSYMPTOM\nSecondary text in `fabro` CLI tables is hardcoded to `Color::Ansi256(8)` (\"bright\nblack\" — a fixed dark grey from the palette). That assumes a light terminal\nbackground; on a dark theme it renders nearly invisible against the background.\nReproduced by the user with `fabro workflow list`, where the DESCRIPTION column\nis unreadable.\n\nLOCATIONS — 10 occurrences in 4 files, all under\nlib/apps/fabro-cli/src/commands/\n  runs/list.rs         6  (lines 128, 138, 148, 178, 184, 185)\n  model.rs             2  (lines 135, 138)\n  workflow/list.rs     1  (line 113)\n  run/checkpoints.rs   1  (line 93)\n\nruns/list.rs is the worst case: line 178 uses Ansi256(8) as a *status* color and\nline 184 suppresses bold for it, so a run status is conveyed entirely by a color\nthe user cannot see. This is not purely cosmetic.\n\nSUSPECTED CAUSE\nAn absolute palette index is used where a terminal-relative attribute belongs.\nThe codebase already has the right primitive: `fabro_util::terminal::Styles::dim`\n= `Style::new().dim()` at lib/foundation/fabro-util/src/terminal.rs:28. It emits\nSGR 2 (faint) against the terminal's own foreground, so it adapts to the theme.\nworkflow/list.rs already uses `styles.dim` for the section path in\n`print_section` — the table cells in the same file just don't.\n\nOPEN QUESTION — resolve this before choosing the fix\nDoes cli-table 0.5's `CellStruct` expose a faint/dim attribute the way it exposes\n`.bold(bool)`? Check the actual crate source in the cargo registry rather than\nguessing. Three ways it can go:\n  a) If CellStruct has a faint/dim attribute, use it. Cleanest.\n  b) Otherwise pre-apply the dim style to the string before `.cell()`. Risk:\n     cli-table's column width measurement may count the embedded ANSI escape\n     codes and mis-align the table. Verify alignment if taking this path.\n  c) As a last resort pick a mid-tone color readable on both light and dark\n     backgrounds — but this still absolutizes what should be relative.\n\nNote all styling here already goes through the `use_color` flag via\n`color_if()`, so the no-color path is unaffected either way.\n\nCONTRIBUTION PATH\nPer CONTRIBUTING.md this qualifies as a \"bug fix / small improvement\" — send a\nPR directly, no issue needed. The `origin` remote is the fork\ncarllelandtaylor/fabro; `upstream` is fabro-sh/fabro and its push URL is\nDISABLED, so push branches to `origin` only. Branch from main and open the PR\nagainst fabro-sh/fabro main, e.g.\n\n  gh pr create --repo fabro-sh/fabro --base main --head carllelandtaylor:<branch>\n\nREQUIRED CHECKS (CONTRIBUTING.md's list is stale relative to CI — use these)\n  cargo nextest run --workspace\n  cargo +nightly-2026-04-14 fmt --check --all\n  cargo +nightly-2026-04-14 clippy --workspace --all-targets -- -D warnings\nThe pinned nightly matters: stable rustfmt will not match CI.\n\nVERIFICATION\nNo existing test covers this. Add one asserting the faint attribute (or whatever\nthe chosen mechanism emits) so this cannot regress. Manually verify the rendered\noutput against both a light and a dark terminal profile.\n",
+          "internal.thread_id": "fix-bug",
+          "thread.fix-bug.current_node": "understand_locate",
+          "last_stage": "understand_locate",
+          "response.understand_locate": "facto-helper.sh isn't present anywhere in this environment, so the optional tracker status write can't be performed — I'll note this as a warning and move on to code verification, per the guardrails (best-effort, non-blocking).\n\nNow let me verify the 10 occurrences and check the cli-table crate source for a dim/faint attribute.All 10 occurrences confirmed matching the report exactly. Now let's inspect the cli-table crate source to answer the open question about a faint/dim attribute on `CellStruct`.## Investigation Summary\n\n**EXPECTED BEHAVIOR:** Secondary/muted text in `fabro` CLI tables (IDs, descriptions, goals, \"Dead\"/\"Pending\" status) should remain legibly dim against the terminal's own foreground/background, adapting to both light and dark themes.\n\n**ACTUAL BEHAVIOR:** Secondary text is colored with the absolute palette index `Color::Ansi256(8)` (\"bright black\"), a fixed dark grey tuned for light backgrounds. On dark themes it's nearly invisible against the background. In `runs/list.rs::status_cell` this is worse than cosmetic: `Ansi256(8)` is also used as the color for `RunStatus::Submitted | Pending | Dead`, and bold is explicitly suppressed for that color (line 184), so those three run statuses are conveyed *only* through a color the user can't see.\n\n**AFFECTED AREA:** `fabro` CLI table rendering — `fabro run list`, `fabro model list`, `fabro workflow list`, `fabro run checkpoints` (or equivalent checkpoint-listing command).\n\n**FILES AND FUNCTIONS TRACED** (all under `lib/apps/fabro-cli/src/commands/`), all 10 occurrences confirmed via grep at the exact lines reported:\n- `runs/list.rs` — the run-listing table builder (run-id/parent-id/goal columns at 128/138/148) and `status_cell()` (173–185), where `Ansi256(8)` doubles as both a color and a bold-suppression sentinel for `Submitted`/`Pending`/`Dead` statuses.\n- `model.rs` — `model_row()` (122–145): provider and aliases columns at 135/138.\n- `workflow/list.rs` — the workflow table row builder inside `print_section` (98–116): DESCRIPTION column at 113. Notably, the same function already dims the section path correctly via `styles.dim.apply_to(...)` at line 85/88 — the table cells are the inconsistent part.\n- `run/checkpoints.rs` — the checkpoint-listing row builder (70–96): detail-string column at 93.\n\nAll ten sites route through a local `color_if(use_color, color) -> Option<Color>` helper (defined twice, once in `shared/utilities.rs:166` and duplicated in `model.rs:110`), so the no-color path is confirmed unaffected regardless of fix approach.\n\n**OPEN QUESTION — resolved:** Checked the actual `cli-table 0.5.0` source in the cargo registry (`~/.cargo/registry/.../cli-table-0.5.0/src/style.rs` and `cell.rs`). `CellStruct` implements the crate's `Style` trait, which includes `fn dimmed(self, dimmed: bool) -> Self` alongside `.bold(bool)` — it sets `ColorSpec::set_dimmed` on the underlying `termcolor::ColorSpec`, terminal-relative (SGR faint), exactly analogous to `fabro_util::terminal::Styles::dim`. This is **option (a)** from the report: no need to pre-apply ANSI codes into strings (option b) or pick a fixed mid-tone color (option c). The fix is mechanical — replace each `.foreground_color(color_if(use_color, Color::Ansi256(8)))` with `.dimmed(use_color)`, and in `status_cell()` replace the `Ansi256(8)` sentinel/bold-suppression logic with the same `.dimmed()` call so the status text itself carries the dim treatment instead of an invisible color.\n\n**OPTIONAL STATUS WRITE:** Skipped with a warning — `facto-helper.sh` was not found anywhere in this environment (no issue tracker integration present), so the in-progress status update could not be attempted. This is non-blocking per the guardrails.\n\nNo code changes were made in this pass — this was the read/locate/triage phase. Ready to proceed to the fix (apply `.dimmed(use_color)` across the four files, add a regression test asserting the dim attribute is emitted, run the required fmt/clippy/nextest checks, and open the PR) on your go-ahead.",
+          "last_response": "facto-helper.sh isn't present anywhere in this environment, so the optional tracker status write can't be performed — I'll note this as a warning and move on to code verification, per the guardrails",
+          "internal.fidelity": "full",
+          "internal.retry_count.start": 0,
+          "graph.rankdir": "LR",
+          "outcome": "succeeded"
+        },
+        "node_outcomes": {
+          "understand_locate": {
+            "status": "succeeded",
+            "context_updates": {
+              "last_stage": "understand_locate",
+              "last_response": "facto-helper.sh isn't present anywhere in this environment, so the optional tracker status write can't be performed — I'll note this as a warning and move on to code verification, per the guardrails",
+              "response.understand_locate": "facto-helper.sh isn't present anywhere in this environment, so the optional tracker status write can't be performed — I'll note this as a warning and move on to code verification, per the guardrails (best-effort, non-blocking).\n\nNow let me verify the 10 occurrences and check the cli-table crate source for a dim/faint attribute.All 10 occurrences confirmed matching the report exactly. Now let's inspect the cli-table crate source to answer the open question about a faint/dim attribute on `CellStruct`.## Investigation Summary\n\n**EXPECTED BEHAVIOR:** Secondary/muted text in `fabro` CLI tables (IDs, descriptions, goals, \"Dead\"/\"Pending\" status) should remain legibly dim against the terminal's own foreground/background, adapting to both light and dark themes.\n\n**ACTUAL BEHAVIOR:** Secondary text is colored with the absolute palette index `Color::Ansi256(8)` (\"bright black\"), a fixed dark grey tuned for light backgrounds. On dark themes it's nearly invisible against the background. In `runs/list.rs::status_cell` this is worse than cosmetic: `Ansi256(8)` is also used as the color for `RunStatus::Submitted | Pending | Dead`, and bold is explicitly suppressed for that color (line 184), so those three run statuses are conveyed *only* through a color the user can't see.\n\n**AFFECTED AREA:** `fabro` CLI table rendering — `fabro run list`, `fabro model list`, `fabro workflow list`, `fabro run checkpoints` (or equivalent checkpoint-listing command).\n\n**FILES AND FUNCTIONS TRACED** (all under `lib/apps/fabro-cli/src/commands/`), all 10 occurrences confirmed via grep at the exact lines reported:\n- `runs/list.rs` — the run-listing table builder (run-id/parent-id/goal columns at 128/138/148) and `status_cell()` (173–185), where `Ansi256(8)` doubles as both a color and a bold-suppression sentinel for `Submitted`/`Pending`/`Dead` statuses.\n- `model.rs` — `model_row()` (122–145): provider and aliases columns at 135/138.\n- `workflow/list.rs` — the workflow table row builder inside `print_section` (98–116): DESCRIPTION column at 113. Notably, the same function already dims the section path correctly via `styles.dim.apply_to(...)` at line 85/88 — the table cells are the inconsistent part.\n- `run/checkpoints.rs` — the checkpoint-listing row builder (70–96): detail-string column at 93.\n\nAll ten sites route through a local `color_if(use_color, color) -> Option<Color>` helper (defined twice, once in `shared/utilities.rs:166` and duplicated in `model.rs:110`), so the no-color path is confirmed unaffected regardless of fix approach.\n\n**OPEN QUESTION — resolved:** Checked the actual `cli-table 0.5.0` source in the cargo registry (`~/.cargo/registry/.../cli-table-0.5.0/src/style.rs` and `cell.rs`). `CellStruct` implements the crate's `Style` trait, which includes `fn dimmed(self, dimmed: bool) -> Self` alongside `.bold(bool)` — it sets `ColorSpec::set_dimmed` on the underlying `termcolor::ColorSpec`, terminal-relative (SGR faint), exactly analogous to `fabro_util::terminal::Styles::dim`. This is **option (a)** from the report: no need to pre-apply ANSI codes into strings (option b) or pick a fixed mid-tone color (option c). The fix is mechanical — replace each `.foreground_color(color_if(use_color, Color::Ansi256(8)))` with `.dimmed(use_color)`, and in `status_cell()` replace the `Ansi256(8)` sentinel/bold-suppression logic with the same `.dimmed()` call so the status text itself carries the dim treatment instead of an invisible color.\n\n**OPTIONAL STATUS WRITE:** Skipped with a warning — `facto-helper.sh` was not found anywhere in this environment (no issue tracker integration present), so the in-progress status update could not be attempted. This is non-blocking per the guardrails.\n\nNo code changes were made in this pass — this was the read/locate/triage phase. Ready to proceed to the fix (apply `.dimmed(use_color)` across the four files, add a regression test asserting the dim attribute is emitted, run the required fmt/clippy/nextest checks, and open the PR) on your go-ahead."
+            },
+            "notes": "Stage completed: understand_locate",
+            "usage": null,
+            "timing": {
+              "wall_time_ms": 0,
+              "inference_time_ms": 80841,
+              "tool_time_ms": 0,
+              "active_time_ms": 80841
+            }
+          },
+          "start": {
+            "status": "succeeded",
+            "usage": null
+          }
+        },
+        "next_node_id": "repro.understand_report",
+        "node_visits": {
+          "start": 1,
+          "understand_locate": 1
+        }
+      },
+      "diff": {}
+    }
+  ],
   "conclusion": null,
   "sandbox": {
     "kind": "ready",
@@ -9773,5 +9873,77 @@
   "pull_request": null,
   "superseded_by": null,
   "pending_interviews": {},
-  "stages": {}
+  "stages": {
+    "start@1": {
+      "first_event_seq": 18,
+      "prompt": null,
+      "response": null,
+      "completion": {
+        "outcome": "succeeded",
+        "notes": null,
+        "failure_reason": null,
+        "timestamp": "2026-08-06T20:04:08.990952763Z"
+      },
+      "provider_used": null,
+      "diff": null,
+      "script_invocation": null,
+      "script_timing": null,
+      "parallel_results": null,
+      "output": null,
+      "started_at": "2026-08-06T20:04:08.983781245Z",
+      "handler": "start",
+      "graph_visit": 1,
+      "timing": {
+        "wall_time_ms": 0,
+        "inference_time_ms": 0,
+        "tool_time_ms": 0,
+        "active_time_ms": 0
+      },
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_tokens": 0,
+        "reasoning_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      "agent_control": "running",
+      "state": "succeeded"
+    },
+    "understand_locate@1": {
+      "first_event_seq": 22,
+      "prompt": null,
+      "response": null,
+      "completion": null,
+      "provider_used": {
+        "mode": "acp",
+        "provider": "acp"
+      },
+      "diff": null,
+      "script_invocation": null,
+      "script_timing": {
+        "stdout": "facto-helper.sh isn't present anywhere in this environment, so the optional tracker status write can't be performed — I'll note this as a warning and move on to code verification, per the guardrails (best-effort, non-blocking).\n\nNow let me verify the 10 occurrences and check the cli-table crate source for a dim/faint attribute.All 10 occurrences confirmed matching the report exactly. Now let's inspect the cli-table crate source to answer the open question about a faint/dim attribute on `CellStruct`.## Investigation Summary\n\n**EXPECTED BEHAVIOR:** Secondary/muted text in `fabro` CLI tables (IDs, descriptions, goals, \"Dead\"/\"Pending\" status) should remain legibly dim against the terminal's own foreground/background, adapting to both light and dark themes.\n\n**ACTUAL BEHAVIOR:** Secondary text is colored with the absolute palette index `Color::Ansi256(8)` (\"bright black\"), a fixed dark grey tuned for light backgrounds. On dark themes it's nearly invisible against the background. In `runs/list.rs::status_cell` this is worse than cosmetic: `Ansi256(8)` is also used as the color for `RunStatus::Submitted | Pending | Dead`, and bold is explicitly suppressed for that color (line 184), so those three run statuses are conveyed *only* through a color the user can't see.\n\n**AFFECTED AREA:** `fabro` CLI table rendering — `fabro run list`, `fabro model list`, `fabro workflow list`, `fabro run checkpoints` (or equivalent checkpoint-listing command).\n\n**FILES AND FUNCTIONS TRACED** (all under `lib/apps/fabro-cli/src/commands/`), all 10 occurrences confirmed via grep at the exact lines reported:\n- `runs/list.rs` — the run-listing table builder (run-id/parent-id/goal columns at 128/138/148) and `status_cell()` (173–185), where `Ansi256(8)` doubles as both a color and a bold-suppression sentinel for `Submitted`/`Pending`/`Dead` statuses.\n- `model.rs` — `model_row()` (122–145): provider and aliases columns at 135/138.\n- `workflow/list.rs` — the workflow table row builder inside `print_section` (98–116): DESCRIPTION column at 113. Notably, the same function already dims the section path correctly via `styles.dim.apply_to(...)` at line 85/88 — the table cells are the inconsistent part.\n- `run/checkpoints.rs` — the checkpoint-listing row builder (70–96): detail-string column at 93.\n\nAll ten sites route through a local `color_if(use_color, color) -> Option<Color>` helper (defined twice, once in `shared/utilities.rs:166` and duplicated in `model.rs:110`), so the no-color path is confirmed unaffected regardless of fix approach.\n\n**OPEN QUESTION — resolved:** Checked the actual `cli-table 0.5.0` source in the cargo registry (`~/.cargo/registry/.../cli-table-0.5.0/src/style.rs` and `cell.rs`). `CellStruct` implements the crate's `Style` trait, which includes `fn dimmed(self, dimmed: bool) -> Self` alongside `.bold(bool)` — it sets `ColorSpec::set_dimmed` on the underlying `termcolor::ColorSpec`, terminal-relative (SGR faint), exactly analogous to `fabro_util::terminal::Styles::dim`. This is **option (a)** from the report: no need to pre-apply ANSI codes into strings (option b) or pick a fixed mid-tone color (option c). The fix is mechanical — replace each `.foreground_color(color_if(use_color, Color::Ansi256(8)))` with `.dimmed(use_color)`, and in `status_cell()` replace the `Ansi256(8)` sentinel/bold-suppression logic with the same `.dimmed()` call so the status text itself carries the dim treatment instead of an invisible color.\n\n**OPTIONAL STATUS WRITE:** Skipped with a warning — `facto-helper.sh` was not found anywhere in this environment (no issue tracker integration present), so the in-progress status update could not be attempted. This is non-blocking per the guardrails.\n\nNo code changes were made in this pass — this was the read/locate/triage phase. Ready to proceed to the fix (apply `.dimmed(use_color)` across the four files, add a regression test asserting the dim attribute is emitted, run the required fmt/clippy/nextest checks, and open the PR) on your go-ahead.",
+        "stderr": "",
+        "stop_reason": "end_turn",
+        "duration_ms": 80841
+      },
+      "parallel_results": null,
+      "output": null,
+      "termination": "exited",
+      "started_at": "2026-08-06T20:04:08.996413948Z",
+      "handler": "agent",
+      "graph_visit": 1,
+      "live_inference_ms": 80841,
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_tokens": 0,
+        "reasoning_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      "agent_control": "running",
+      "state": "running"
+    }
+  }
 }
