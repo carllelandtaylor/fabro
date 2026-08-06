@@ -1,0 +1,6 @@
+{
+  "outcome": "failed",
+  "notes": null,
+  "failure_reason": "Script failed with exit code: 127\n\n## output\n/bin/bash: line 2: facto-helper.sh: command not found\n",
+  "timestamp": "2026-08-06T23:56:26.409158455Z"
+}
