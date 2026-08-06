@@ -11196,7 +11196,7 @@
     "kind": "running"
   },
   "status_updated_at": "2026-08-06T23:17:42.746161670Z",
-  "last_event_at": "2026-08-06T23:39:40.011790450Z",
+  "last_event_at": "2026-08-06T23:39:41.843601085Z",
   "pending_control": null,
   "checkpoints": [
     {
@@ -12426,8 +12426,8 @@
     {
       "seq": 0,
       "checkpoint": {
-        "timestamp": "2026-08-06T23:39:40.024562722Z",
-        "current_node": "assess_fix_size",
+        "timestamp": "2026-08-06T23:39:44.000867797Z",
+        "current_node": "escalated_gate",
         "completed_nodes": [
           "start",
           "understand_locate",
@@ -12438,7 +12438,8 @@
           "repro.report_result",
           "check_repro",
           "diagnose",
-          "assess_fix_size"
+          "assess_fix_size",
+          "escalated_gate"
         ],
         "node_retries": {},
         "context_values": {
@@ -12454,9 +12455,10 @@
           "thread.check_repro.current_node": "diagnose",
           "internal.retry_count.repro.report_result": 0,
           "internal.node_visit_count": 1,
+          "thread.assess_fix_size.current_node": "escalated_gate",
           "response.repro.report_result": "No template file found locally — I'll build the report directly from the instructions' section list. Now writing `.facto/result.md`.The bug brief was already updated and committed in the prior `repro.confirm_distill` stage — it's fully current with the minimized repro, evidence, and reliability notes, so no further edits are needed there. `.facto/result.md` is now written with the reproduction report.\n\n## Reproduction report\n\n**Bug:** `fabro` CLI tables hardcode secondary/status text to `Color::Ansi256(8)`, an absolute dark-grey palette color, instead of a terminal-relative dim attribute — nearly invisible on dark-background terminals. 10 confirmed sites across `runs/list.rs`, `model.rs`, `workflow/list.rs`, `run/checkpoints.rs`.\n\n**Reproduced?** Yes, 3/3 deterministic runs.\n1. `cargo build -p fabro-cli`\n2. `TERM=xterm-256color CLICOLOR_FORCE=1 ./target/debug/fabro workflow list 2>&1 | cat -v`\n\nObserved literal `\\x1b[38;5;8m` around the DESCRIPTION cell (vs. plain `\\x1b[36m` on the adjacent NAME cell, proving color output works and this specific site is the defect). Also resolved the reporter's open question: `cli_table::CellStruct::dimmed(bool)` exists and emits proper SGR 2 faint, so the fix path is clear — swap `.foreground_color(color_if(use_color, Color::Ansi256(8)))` for `.dimmed(use_color)` at all ten sites.",
           "failure_class": "",
-          "internal.thread_id": "diagnose",
+          "internal.thread_id": "assess_fix_size",
           "internal.fidelity": "compact",
           "internal.retry_count.assess_fix_size": 0,
           "internal.retry_count.repro.confirm_distill": 0,
@@ -12466,7 +12468,7 @@
           "internal.retry_count.start": 0,
           "thread.start.current_node": "understand_locate",
           "response.check_repro": "Both files are consistent: the reproduction report confirms the bug was reproduced deterministically (3/3 runs, byte-identical output) — `fabro workflow list` emits `Color::Ansi256(8)` (`\\x1b[38;5;8m`) for secondary/dim text instead of a terminal-relative dim attribute, contrasted against the adjacent NAME cell's normal `\\x1b[36m` to rule out a global color-suppression artifact.\n\nThe bug-brief's `Preconditions, inputs and environment`, `Reproduction steps (minimized...)`, and `Evidence` sections already contain this exact confirmed repro verbatim — preconditions (repo root, no server needed, `TERM=xterm-256color CLICOLOR_FORCE=1` to force color output in a tty-less sandbox), the two ordered actions (`cargo build -p fabro-cli`, then `./target/debug/fabro workflow list`), the observed `\\x1b[38;5;8m` escape vs. expected `\\x1b[2m` (SGR faint), and the evidence files (`/tmp/wf_list_raw.txt`, `/tmp/repro_confirm.txt`) plus the `cli-table`/`termcolor` source confirmation that `CellStruct::dimmed(bool)` is the correct fix mechanism. Nothing in these sections is a summary or invention — it matches the report's content and the report explicitly states \"Reproduced? Yes.\"\n\nThis stage ends **SUCCEEDED**: the report reproduced the bug and observed the wrong behavior (hardcoded absolute-palette color instead of terminal-relative dim), and the brief already carries the confirmed repro verbatim for later phases to re-run exactly.",
-          "current_node": "assess_fix_size",
+          "current_node": "escalated_gate",
           "last_stage": "assess_fix_size",
           "thread.diagnose.current_node": "assess_fix_size",
           "response.assess_fix_size": "**Decision: ESCALATE**\n\nTrigger: the checklist item \"touches more than about two files\" — the fix requires changes across four files (`lib/apps/fabro-cli/src/commands/runs/list.rs`, `model.rs`, `workflow/list.rs`, `run/checkpoints.rs`), plus a new regression test asserting on emitted ANSI/SGR bytes. It also involves a small logic restructuring in `runs/list.rs::status_cell` (replacing the `Ansi256(8)` sentinel comparison with an explicit `is_dim` flag), not a pure search-and-replace. No new abstraction/interface, schema/API/migration change is involved — only the file-count criterion triggered escalation.\n\nEnding this stage as **SUCCEEDED** (escalated path).",
@@ -12479,6 +12481,7 @@
           "response.understand_locate": "Now writing the brief from the report content only, without touching the rest of the codebase.`.facto/bug-brief.md` is written. Summary:\n\n**Filled in:** Report source, Expected behavior, Actual behavior, Affected area, Reported hypothesis (verbatim reporter claims, including the claimed file/line table, the `cli-table` open question, and the \"no existing test\" note).\n\n**Left `Unknown`:** Code locations (verifying them is a later stage's job, per instructions — the reporter's claimed table is preserved under Reported hypothesis instead), Preconditions/environment (partially filled, but exact terminal/theme unspecified), Reproduction steps (inferred general steps only, no exact captured transcript in the report), Evidence (none was provided — no screenshots/logs/output), Root cause (diagnosis stage's job).\n\n**Fix constraints:** recorded the reporter's open technical question plus the standing workflow constraints (fix root cause, don't weaken functionality, add a regression test).\n\n**Optional status write:** skipped with a warning — `facto-helper.sh` is not present anywhere on this machine, and the report is free text with no associated issue number, so there's no tracker item to update.",
           "internal.retry_count.repro.understand_report": 0,
           "thread.repro.report_result.current_node": "check_repro",
+          "internal.retry_count.escalated_gate": 0,
           "thread.fix-bug.repro.current_node": "repro.report_result"
         },
         "node_outcomes": {
@@ -12644,12 +12647,18 @@
               "tool_time_ms": 0,
               "active_time_ms": 24426
             }
+          },
+          "escalated_gate": {
+            "status": "succeeded",
+            "notes": "Conditional node evaluated: escalated_gate",
+            "usage": null
           }
         },
-        "next_node_id": "escalated_gate",
+        "next_node_id": "plan_brief",
         "node_visits": {
           "repro.confirm_distill": 1,
           "understand_locate": 1,
+          "escalated_gate": 1,
           "start": 1,
           "repro.understand_report": 1,
           "diagnose": 1,
@@ -12865,7 +12874,12 @@
       "first_event_seq": 134,
       "prompt": null,
       "response": null,
-      "completion": null,
+      "completion": {
+        "outcome": "succeeded",
+        "notes": "Stage completed: assess_fix_size",
+        "failure_reason": null,
+        "timestamp": "2026-08-06T23:39:40.024432012Z"
+      },
       "provider_used": {
         "mode": "acp",
         "provider": "acp"
@@ -12884,7 +12898,12 @@
       "started_at": "2026-08-06T23:39:28.934486059Z",
       "handler": "agent",
       "graph_visit": 1,
-      "live_inference_ms": 10852,
+      "timing": {
+        "wall_time_ms": 11084,
+        "inference_time_ms": 10852,
+        "tool_time_ms": 0,
+        "active_time_ms": 10852
+      },
       "usage": {
         "input_tokens": 0,
         "output_tokens": 0,
@@ -12894,7 +12913,7 @@
         "cache_write_tokens": 0
       },
       "agent_control": "running",
-      "state": "running"
+      "state": "succeeded"
     },
     "repro.report_result@1": {
       "first_event_seq": 92,
