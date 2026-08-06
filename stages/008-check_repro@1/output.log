@@ -1,0 +1,37 @@
+I read through the previous stages' work (git history for this run shows empty diffs — no separate report artifact file exists in `.fabro/`, `/root/.fabro/`, or elsewhere — so the detailed bug report in this stage's context, including SYMPTOM/LOCATIONS/SUSPECTED CAUSE, is the only reproduction record available). I independently re-verified it against the live source tree rather than taking it on faith.
+
+**Verification performed:**
+1. Confirmed all 10 cited `Color::Ansi256(8)` occurrences exist at the exact file:line locations claimed (`runs/list.rs:128,138,148,178,184,185`, `model.rs:135,138`, `workflow/list.rs:113`, `run/checkpoints.rs:93`) via `grep -n`.
+2. Built `fabro` (`cargo build -p fabro-cli --bin fabro`) and ran `CLICOLOR_FORCE=1 ./target/debug/fabro workflow list`, confirming the command executes without needing the server (matching the user's reported repro command) and that the printer already emits real SGR sequences (`^[[1m` bold, `^[[2m` dim) elsewhere in the same output — confirming the terminal styling pipeline is live and `styles.dim` (SGR 2/faint) is the theme-relative alternative already in use in `print_section` of the same file, exactly as the report claims.
+3. Confirmed `runs/list.rs:178,184,185` uses `Ansi256(8)` as the *default status color* and conditionally suppresses bold specifically when the color equals `Ansi256(8)` — so on a dark theme, a run's status is conveyed by a color that becomes indistinguishable from the background, with no bold fallback to compensate.
+
+This is a source-verifiable defect, not one requiring a live visual dark-theme screenshot: `Color::Ansi256(8)` is an absolute palette index (fixed dark grey) applied via `.foreground_color()`, which does not adapt to the terminal's background the way `Style::new().dim()` (SGR 2, relative to the terminal's own foreground) does.
+
+## Confirmed repro (verbatim for later phases)
+
+**PRECONDITIONS**
+- Working tree: this repo (`fabro`) at current HEAD, in `lib/apps/fabro-cli/src/commands/`.
+- A terminal with a dark background theme (the palette index `Ansi256(8)` renders as near-black-on-black; on a light theme it's legible).
+- No `NO_COLOR` env var set; `use_color` resolves true (default when stdout/stderr is a TTY, or forced via `CLICOLOR_FORCE=1`).
+- A fabro project with `.fabro/workflows/` populated (this repo qualifies) — for the DESCRIPTION column specifically, a workflow whose `workflow.toml` sets `run.goal` to non-empty text will populate the column with `Ansi256(8)`-colored text.
+
+**ORDERED STEPS**
+1. `cd` into a fabro project directory (e.g. this repo).
+2. Run `fabro workflow list` in a terminal with a dark color scheme.
+3. Observe the DESCRIPTION column of the rendered table.
+4. (Worst-case variant) Run `fabro run list` (or equivalent runs-listing command) and observe the STATUS column, where the same `Ansi256(8)` value is used as the *only* signal for certain statuses (line 178), with bold explicitly suppressed for that case (line 184).
+
+**OBSERVED (wrong) RESULT**
+- DESCRIPTION column text (and other secondary text in `model.rs`/`checkpoints.rs` tables) renders in `Color::Ansi256(8)`, a fixed dark-grey palette entry, making it nearly invisible against a dark terminal background.
+- In `runs/list.rs`, run status is conveyed by this same unreadable color with bold turned off, so the status is effectively unreadable with no fallback cue.
+
+**EXPECTED RESULT**
+- Secondary/dim text should use a terminal-relative style (`fabro_util::terminal::Styles::dim`, i.e. `Style::new().dim()` / SGR 2 faint) so it adapts to the user's theme, consistent with how `workflow/list.rs`'s `print_section` already renders the section path.
+- Status text should never rely solely on a potentially-invisible color; readability must hold on both light and dark themes.
+
+**EVIDENCE**
+- `grep -n "Ansi256(8)"` across the 4 files reproduces exactly the 10 locations and line numbers claimed, including the dual status-color/bold-suppression logic at `runs/list.rs:178,184,185`.
+- `fabro_util::terminal::Styles::dim` at `lib/foundation/fabro-util/src/terminal.rs:28` is defined as `Style::new().dim()` and is already used correctly for analogous secondary text in `workflow/list.rs`'s `print_section`, but not for the table cells in the same file.
+- Built binary confirms the styling pipeline (`use_color` → `color_if()`) is live and produces real ANSI SGR output in this environment.
+
+The bug is reproduced — the code paths and exact wrong behavior (hardcoded absolute-palette color rendering illegible/status-ambiguous on dark themes) are confirmed against current source. This stage ends **SUCCEEDED**.
