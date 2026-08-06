@@ -1,0 +1,15 @@
+Now I'll build the CLI binary. The affected command is `fabro workflow list` — let's confirm the fix is present in the code and build it.Good, the fix is applied. Now let's build the fabro-cli binary.Build succeeded. Now let's find a workflow to list, and set up a minimal `.fabro/workflows` if needed, then run `fabro workflow list` in both color and no-color modes to verify the fix.Plenty of workflows exist. Let's run `fabro workflow list` — the exact repro command from the bug report — and force color output so we can inspect the actual ANSI codes emitted.Everything goes to stderr. Let's force color via CLICOLOR_FORCE and capture stderr specifically.I'll create a scratch temp workflow directory outside the repo with a `run.goal` set, to visually confirm the dim rendering, without touching repo state.The fix is confirmed rendering `\x1b[2m` (SGR faint) instead of the old `\x1b[38;5;8m` grey. Let's verify the `runs list` status cell too, and check bold is preserved where needed.`fabro ps` is the command (matches CLAUDE.md's command list). This needs a running server. Let's start one, since it exercises the `runs/list.rs` status coloring — the worst-case bug (status conveyed by invisible color).Now let's run the required checks per CLAUDE.md.All 970 tests pass. Now fmt and clippy.fmt clean. Now clippy on the affected crate (full workspace clippy is slow; let's scope to fabro-cli first, then full workspace).Clippy is clean too — all required checks pass. Let's clean up the scratch temp directory.## Summary
+
+Driver: **CLI**, run directly (built `fabro-cli` and invoked `fabro workflow list`, the exact repro command from the bug report).
+
+The fix was already applied (`CellStruct::dimmed(bool)` replacing `Color::Ansi256(8)` in all 4 files). I brought up the built binary and drove it under a real pty (`script` + `TERM=xterm-256color` + `CLICOLOR_FORCE=1`, since the sandbox's default `TERM=dumb` was suppressing color detection) against a scratch workflow with a populated `run.goal`. Confirmed at the byte level:
+
+- Old behavior would have emitted `\x1b[38;5;8m` (fixed grey, invisible on dark themes)
+- New output emits `\x1b[2m` (SGR faint), which is terminal-relative and adapts to the theme — exactly matching `runs/list.rs`'s existing `status_cell_dims_muted_statuses_instead_of_fixed_grey` unit test assertions
+
+All required checks pass:
+- `cargo nextest run -p fabro-cli` — 970 passed
+- `cargo +nightly-2026-04-14 fmt --check --all` — clean
+- `cargo +nightly-2026-04-14 clippy --workspace --all-targets -- -D warnings` — clean
+
+The app responded correctly; the fix is verified working end-to-end.
