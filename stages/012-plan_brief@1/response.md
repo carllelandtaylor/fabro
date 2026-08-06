@@ -1,0 +1,80 @@
+Good, this confirms it's the `diagnose` stage. Now let me pull the final diagnosis output and the repro-stage transcripts.Now let me pull the escalation decision from the assess_fix_size stage.## Brief for the fix-planning sub-workflow
+
+**Bug:** CLI table text (secondary/status text) is unreadable on dark terminal themes.
+
+---
+
+### 1. Root cause
+
+**One-line statement:** In `lib/apps/fabro-cli/src/commands/`, secondary/status table cells are colored with the hardcoded, absolute palette color `Color::Ansi256(8)` ("bright black") instead of the terminal-relative dim style (`fabro_util::terminal::Styles::dim`, `Style::new().dim()`, SGR 2 "faint") that the codebase already defines and already uses elsewhere in the same files — so on dark-background themes the text renders nearly invisible instead of adapting to the terminal's own foreground.
+
+**Trace supporting it:** `console::Style::new().dim()` emits the relative SGR `\x1b[2m` (faint relative to current foreground), which is legible on both light and dark backgrounds. `cli_table`'s `.foreground_color(Color::Ansi256(8))` instead emits a fixed indexed-color escape (`\x1b[38;5;8m`) whose actual rendered RGB is entirely terminal-theme-dependent — on many dark themes it's nearly indistinguishable from the background. `workflow/list.rs`'s `print_section` already uses `styles.dim` correctly for the section path (a `\x1b[2m` sequence), proving the correct primitive is available and already adopted in this file — it's just not applied to the table cells.
+
+**Files and functions involved (10 occurrences, 4 files, all under `lib/apps/fabro-cli/src/commands/`):**
+- `workflow/list.rs:113` — `print_section`, DESCRIPTION column. This is the specific site the diagnosis stage traced and confirmed against source.
+- `runs/list.rs:128, 138, 148, 178, 184, 185` — worst case: line 178 uses `Ansi256(8)` as the *default status color*, and line 184 conditionally suppresses bold specifically when the color equals `Ansi256(8)` — so a run's status is conveyed by color alone, with no bold fallback, and becomes unreadable on dark themes.
+- `model.rs:135, 138`
+- `run/checkpoints.rs:93`
+
+The correct primitive to migrate all 10 sites to is `fabro_util::terminal::Styles::dim` at `lib/foundation/fabro-util/src/terminal.rs:28`.
+
+---
+
+### 2. Logged reproduction steps (verbatim — the plan's validation must re-run exactly this)
+
+**PRECONDITIONS**
+- Working tree: this repo (`fabro`) at current HEAD, in `lib/apps/fabro-cli/src/commands/`.
+- A terminal with a dark background theme (the palette index `Ansi256(8)` renders as near-black-on-black; on a light theme it's legible).
+- No `NO_COLOR` env var set; `use_color` resolves true (default when stdout/stderr is a TTY, or forced via `CLICOLOR_FORCE=1`).
+- A fabro project with `.fabro/workflows/` populated (this repo qualifies) — for the DESCRIPTION column specifically, a workflow whose `workflow.toml` sets `run.goal` to non-empty text will populate the column with `Ansi256(8)`-colored text.
+
+**ORDERED STEPS**
+1. `cd` into a fabro project directory (e.g. this repo).
+2. Run `fabro workflow list` in a terminal with a dark color scheme.
+3. Observe the DESCRIPTION column of the rendered table.
+4. (Worst-case variant) Run `fabro run list` (or equivalent runs-listing command) and observe the STATUS column, where the same `Ansi256(8)` value is used as the *only* signal for certain statuses (line 178), with bold explicitly suppressed for that case (line 184).
+
+**OBSERVED (WRONG) RESULT**
+- DESCRIPTION column text (and other secondary text in `model.rs`/`checkpoints.rs` tables) renders in `Color::Ansi256(8)`, a fixed dark-grey palette entry, making it nearly invisible against a dark terminal background.
+- In `runs/list.rs`, run status is conveyed by this same unreadable color with bold turned off, so the status is effectively unreadable with no fallback cue.
+
+**EXPECTED RESULT**
+- Secondary/dim text should use a terminal-relative style (`fabro_util::terminal::Styles::dim`, i.e. `Style::new().dim()` / SGR 2 faint) so it adapts to the user's theme, consistent with how `workflow/list.rs`'s `print_section` already renders the section path.
+- Status text should never rely solely on a potentially-invisible color; readability must hold on both light and dark themes.
+
+**EVIDENCE**
+- `grep -n "Ansi256(8)"` across the 4 files reproduces exactly the 10 locations and line numbers above.
+- Built binary (`cargo build -p fabro-cli --bin fabro`) confirms the styling pipeline (`use_color` → `color_if()`) is live and produces real ANSI SGR output; other elements in the same commands already emit correct `\x1b[2m`/`\x1b[1m` sequences, isolating the defect to these specific call sites.
+
+---
+
+### 3. No-regression constraint (HARD constraint on every step of the plan)
+
+Every step of the fix must preserve existing working behavior. Specifically:
+- The no-color path (when `use_color` is false / `NO_COLOR` set / non-TTY) is unaffected today via the existing `color_if()` gating — the plan must not alter that gating or its behavior.
+- Table column alignment must not break: if the fix pre-applies ANSI escapes to a string before `.cell()`, verify `cli_table`'s width measurement still aligns columns correctly (embedded escape codes can be miscounted as visible width).
+- The DESCRIPTION/STATUS columns must remain visually distinguished as secondary/de-emphasized relative to primary columns (e.g. bold NAME) — de-emphasis must be replaced with a theme-adaptive equivalent, not removed.
+- In `runs/list.rs`, status must not become conveyed by color alone in any theme — do not simply recolor without addressing the bold-suppression-on-`Ansi256(8)` logic at line 184, or the status-readability defect will only be partially fixed.
+- Do not remove, disable, or weaken any of the 10 existing color/style call sites' functional intent (i.e., don't strip styling entirely to "fix" invisibility) — replace the absolute-palette mechanism with the relative-dim mechanism at each site, not delete styling.
+
+This is a constraint on every stage of the plan, not a preference: no step may make the bug "disappear" by turning off or degrading working functionality.
+
+---
+
+### 4. Regression test requirement
+
+The plan must include a test that fails on current (unfixed) code and passes after the fix, for each of the affected files where feasible:
+- Assert the rendered cell/output contains the dim escape sequence `\x1b[2m` (or whatever `Styles::dim` emits) rather than the indexed-color escape `\x1b[38;5;8m`, for the DESCRIPTION column (`workflow/list.rs`) and equivalent secondary-text columns in `runs/list.rs`, `model.rs`, `run/checkpoints.rs`.
+- This can extend the existing `Styles` tests in `lib/foundation/fabro-util/src/terminal.rs` and/or add new tests local to each `commands/*.rs` file that capture color output for representative input (e.g., a workflow with `goal` set, a run with the affected status) and assert on the escape sequence.
+- No existing test currently covers this — confirmed during the check_repro stage.
+- Manual verification (documented in the CONTRIBUTING checklist context) should additionally confirm the rendered output is legible against both a light and a dark terminal profile.
+
+---
+
+### 5. Escalation reason (scope the plan to this reality)
+
+**Decision: ESCALATE.**
+
+**Triggering checklist item:** "the fix touches more than about two files." The diagnosis identified 10 occurrences of the same defect across **4 files** (`runs/list.rs`, `model.rs`, `workflow/list.rs`, `run/checkpoints.rs`), all under `lib/apps/fabro-cli/src/commands/`, all requiring the same `Ansi256(8)` → dim-attribute migration — double the two-file direct-path ceiling before even counting new regression test file(s).
+
+No other escalation criterion independently applies: the fix reuses the existing `fabro_util::terminal::Styles::dim` primitive rather than introducing a new abstraction or interface, does not touch any schema/API/migration, and does not touch shared core logic beyond a primitive that's already defined and already used elsewhere in the same file (`workflow/list.rs`'s `print_section`). The plan should be scoped accordingly: this is a **mechanical, repeated-pattern fix across 4 files and up to 10 call sites**, not an architectural change — the planner should sequence per-file (or per-call-site) changes plus their corresponding regression tests, not design new abstractions.
