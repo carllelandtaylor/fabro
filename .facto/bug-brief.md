@@ -32,19 +32,25 @@ Still open (the reporter's stated open question, unresolved by this stage — no
 
 ## Preconditions, inputs and environment
 - A terminal emulator/profile configured with a dark background theme.
-- Color output enabled (reporter states all these sites pass through a `use_color` flag via `color_if()`, so this bug does not manifest when color is disabled).
-- Reporter did not specify a particular OS, shell, or terminal emulator — general "dark terminal theme" is the stated condition.
+- Color output enabled. Confirmed by driving the actual built binary: `Styles::detect_stderr()` (used by `workflow list.rs`) calls `console::colors_enabled_stderr()`, which is gated on `env::var("CLICOLOR_FORCE")` (or a real stderr tty) — plain piping/no-tty disables it. Separately and *in addition*, `cli_table`'s own `ColorChoice::Auto` (set from the same `use_color` bool at each call site) is gated on `termcolor`'s `env_allows_color()`, which checks `TERM` (must not be unset/`"dumb"`) and `NO_COLOR` (must be unset) — this check is not tty-based at all, it's pure env var. Both gates must pass for table-body ANSI color to actually appear in the output stream. Reproduced by running the built CLI with `TERM=xterm-256color CLICOLOR_FORCE=1` under a `script`-allocated pty.
+- Reporter did not specify a particular OS, shell, or terminal emulator — general "dark terminal theme" is the stated condition. Not needed for repro: the emitted SGR sequence is visible/verifiable directly in captured output without an actual dark-background display.
 
 ## Reproduction steps
-1. Configure a terminal with a dark background color theme.
-2. Run `fabro workflow list` with color output enabled (default).
-3. Observe the DESCRIPTION column (secondary/dim text) in the printed table.
-4. Compare legibility against the same command run in a terminal with a light background theme.
+Executed directly (CLI driver, no UI needed) against the current branch build:
+1. `cargo build -p fabro-cli` (binary at `target/debug/fabro`).
+2. `TERM=xterm-256color CLICOLOR_FORCE=1 ./target/debug/fabro workflow list 2>&1 | cat -v` (pty allocated via `script -qec ... /tmp/wf_list_raw.txt` gives an identical result; a real pty is not even required here since `cli_table`'s Auto gate is env-based, not tty-based, per above).
+3. Observed output for the DESCRIPTION column of every project-workflow row: `^[[0m^[[0m ^[[0m^[[0m^[[0m^[[38;5;8m           ^[[0m ^[[0m` — i.e. literal escape `\x1b[38;5;8m` (SGR "set foreground to 256-color palette index 8") wraps the cell content exactly as the reporter claimed for `Color::Ansi256(8)`.
+4. Contrast check: the adjacent NAME column in the same row renders `\x1b[36m` (SGR 36, plain ANSI cyan) — confirms cell-level color styling reaches the output stream correctly in this environment, i.e. the DESCRIPTION column's distinct `38;5;8` sequence is not an artifact of color being globally suppressed, it is the specific hardcoded value under test.
+5. Confirmed by direct `printf` comparison that `\x1b[38;5;8m` (absolute palette color) and `\x1b[2m` (SGR 2, "faint/dim", relative to the terminal's own current foreground) are different, non-equivalent escape sequences; only the latter adapts to a light vs. dark terminal foreground.
 
-Unknown: reporter did not give the exact terminal emulator, exact background hex/theme name, or a captured transcript — steps above are inferred from the description of the symptom, not copied from an explicit numbered repro in the report.
+Local project workflows (`.fabro/workflows/*/workflow.toml`) all had empty `goal` fields, so the DESCRIPTION *cell text* itself was blank in this run — the escape sequence still wraps the (empty) cell content identically, which is sufficient to confirm the styling call site fires with the hardcoded color, but there was no local data to produce a directly human-legible "dark grey text on dark background" screenshot. `fabro ps` (the `runs/list.rs` command, which is reachable with populated cells including STATUS) requires a running Fabro server (`fabro server start` / `fabro install`) not available in this environment (`Failed to start fabro server ... no settings.toml configured`) — not exercised live; its code path is identical (`color_if(use_color, Color::Ansi256(8))` / same status-color match) and was verified statically instead in the prior stage.
+
+Unknown: reporter did not give the exact terminal emulator, exact background hex/theme name, or a captured transcript from their own machine — the steps above are an independently executed repro of the same underlying mechanism (hardcoded `Color::Ansi256(8)` reaching the output stream), not a replay of the reporter's own session.
 
 ## Evidence
-Unknown — no screenshots, log excerpts, or command output were included in the report. The report is a prose description of the symptom plus a table of claimed source locations, not captured evidence.
+Captured directly this stage (supersedes prior "Unknown"):
+- Raw captured output at `/tmp/wf_list_raw.txt` (pty-captured via `script`) and inline command output (see Reproduction steps) showing `\x1b[38;5;8m` emitted around the DESCRIPTION cell in `fabro workflow list` table rows, contrasted with `\x1b[36m` on the adjacent NAME cell in the same row.
+- Confirmed via `cli-table` 0.5.0 crate source (`~/.cargo/registry/.../cli-table-0.5.0/src/style.rs`, `cell.rs`) that `CellStruct` (via the `Style` trait, already imported in all four affected files) exposes `fn dimmed(self, bool) -> Self`, which sets `termcolor::ColorSpec.dimmed`. Confirmed via `termcolor` 1.4.1 source (`src/lib.rs` ~line 1525, `Ansi::set_color`) that `spec.dimmed` emits literal `\x1B[2m` (SGR 2, "faint") — a terminal-relative attribute, not an absolute palette color — with no ANSI-in-cell-width concern since it's set via the `Style` trait's structured `ColorSpec`, not by pre-styling the string before `.cell()`. This resolves the reporter's open technical question: `cli-table` 0.5's `CellStruct` *does* support a dim/faint attribute directly, so no string pre-styling + width-measurement workaround is needed.
 
 ## Reported hypothesis
 The reporter's claims, recorded verbatim/paraphrased as their hypothesis — not verified by this stage:
