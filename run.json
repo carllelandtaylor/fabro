@@ -9746,7 +9746,7 @@
     "kind": "running"
   },
   "status_updated_at": "2026-08-06T20:00:25.171295255Z",
-  "last_event_at": "2026-08-06T20:00:51.059161061Z",
+  "last_event_at": "2026-08-06T20:00:55.818034558Z",
   "pending_control": null,
   "checkpoints": [
     {
@@ -10290,9 +10290,9 @@
       }
     },
     {
-      "seq": 0,
+      "seq": 91,
       "checkpoint": {
-        "timestamp": "2026-08-06T20:00:51.281955305Z",
+        "timestamp": "2026-08-06T20:00:55.554501869Z",
         "current_node": "repro.report_result",
         "completed_nodes": [
           "start",
@@ -10305,10 +10305,168 @@
         ],
         "node_retries": {},
         "context_values": {
+          "internal.retry_count.start": 0,
           "current_node": "repro.report_result",
+          "internal.work_dir": "/workspace/fabro",
+          "internal.retry_count.repro.explore_variations": 0,
+          "internal.retry_count.repro.report_result": 0,
+          "failure_signature": "repro.report_result|deterministic|acp turn failed",
+          "internal.node_visit_count": 1,
+          "internal.thread_id": "repro",
+          "graph.rankdir": "LR",
+          "internal.run_id": "01KZCAK4457K0NSJW6ZJ7FK37Z",
+          "outcome": "failed",
+          "internal.fidelity": "compact",
+          "thread.fix-bug.current_node": "understand_locate",
+          "graph.goal": "BUG: CLI table text is unreadable on dark terminal themes.\n\nSYMPTOM\nSecondary text in `fabro` CLI tables is hardcoded to `Color::Ansi256(8)` (\"bright\nblack\" — a fixed dark grey from the palette). That assumes a light terminal\nbackground; on a dark theme it renders nearly invisible against the background.\nReproduced by the user with `fabro workflow list`, where the DESCRIPTION column\nis unreadable.\n\nLOCATIONS — 10 occurrences in 4 files, all under\nlib/apps/fabro-cli/src/commands/\n  runs/list.rs         6  (lines 128, 138, 148, 178, 184, 185)\n  model.rs             2  (lines 135, 138)\n  workflow/list.rs     1  (line 113)\n  run/checkpoints.rs   1  (line 93)\n\nruns/list.rs is the worst case: line 178 uses Ansi256(8) as a *status* color and\nline 184 suppresses bold for it, so a run status is conveyed entirely by a color\nthe user cannot see. This is not purely cosmetic.\n\nSUSPECTED CAUSE\nAn absolute palette index is used where a terminal-relative attribute belongs.\nThe codebase already has the right primitive: `fabro_util::terminal::Styles::dim`\n= `Style::new().dim()` at lib/foundation/fabro-util/src/terminal.rs:28. It emits\nSGR 2 (faint) against the terminal's own foreground, so it adapts to the theme.\nworkflow/list.rs already uses `styles.dim` for the section path in\n`print_section` — the table cells in the same file just don't.\n\nOPEN QUESTION — resolve this before choosing the fix\nDoes cli-table 0.5's `CellStruct` expose a faint/dim attribute the way it exposes\n`.bold(bool)`? Check the actual crate source in the cargo registry rather than\nguessing. Three ways it can go:\n  a) If CellStruct has a faint/dim attribute, use it. Cleanest.\n  b) Otherwise pre-apply the dim style to the string before `.cell()`. Risk:\n     cli-table's column width measurement may count the embedded ANSI escape\n     codes and mis-align the table. Verify alignment if taking this path.\n  c) As a last resort pick a mid-tone color readable on both light and dark\n     backgrounds — but this still absolutizes what should be relative.\n\nNote all styling here already goes through the `use_color` flag via\n`color_if()`, so the no-color path is unaffected either way.\n\nCONTRIBUTION PATH\nPer CONTRIBUTING.md this qualifies as a \"bug fix / small improvement\" — send a\nPR directly, no issue needed. The `origin` remote is the fork\ncarllelandtaylor/fabro; `upstream` is fabro-sh/fabro and its push URL is\nDISABLED, so push branches to `origin` only. Branch from main and open the PR\nagainst fabro-sh/fabro main, e.g.\n\n  gh pr create --repo fabro-sh/fabro --base main --head carllelandtaylor:<branch>\n\nREQUIRED CHECKS (CONTRIBUTING.md's list is stale relative to CI — use these)\n  cargo nextest run --workspace\n  cargo +nightly-2026-04-14 fmt --check --all\n  cargo +nightly-2026-04-14 clippy --workspace --all-targets -- -D warnings\nThe pinned nightly matters: stable rustfmt will not match CI.\n\nVERIFICATION\nNo existing test covers this. Add one asserting the faint attribute (or whatever\nthe chosen mechanism emits) so this cannot regress. Manually verify the rendered\noutput against both a light and a dark terminal profile.\n",
+          "internal.retry_count.repro.bring_up_app": 0,
+          "internal.retry_count.repro.attempt_repro": 0,
+          "internal.retry_count.repro.understand_report": 0,
+          "failure_class": "deterministic",
+          "internal.retry_count.understand_locate": 0,
+          "thread.repro.current_node": "repro.report_result"
+        },
+        "node_outcomes": {
+          "understand_locate": {
+            "status": "failed",
+            "failure": {
+              "message": "ACP turn failed",
+              "causes": [
+                "ACP process exited before protocol completed: termination=exited, exit_code=127"
+              ],
+              "category": "deterministic",
+              "exec_output_tail": {
+                "stderr": "/bin/bash: line 1: claude-agent-acp: command not found\n"
+              }
+            },
+            "usage": null
+          },
+          "repro.report_result": {
+            "status": "failed",
+            "failure": {
+              "message": "ACP turn failed",
+              "causes": [
+                "ACP process exited before protocol completed: termination=exited, exit_code=127"
+              ],
+              "category": "deterministic",
+              "exec_output_tail": {
+                "stderr": "/bin/bash: line 1: claude-agent-acp: command not found\n"
+              }
+            },
+            "usage": null
+          },
+          "repro.attempt_repro": {
+            "status": "failed",
+            "failure": {
+              "message": "ACP turn failed",
+              "causes": [
+                "ACP process exited before protocol completed: termination=exited, exit_code=127"
+              ],
+              "category": "deterministic",
+              "exec_output_tail": {
+                "stderr": "/bin/bash: line 1: claude-agent-acp: command not found\n"
+              }
+            },
+            "usage": null
+          },
+          "start": {
+            "status": "succeeded",
+            "usage": null
+          },
+          "repro.explore_variations": {
+            "status": "failed",
+            "failure": {
+              "message": "ACP turn failed",
+              "causes": [
+                "ACP process exited before protocol completed: termination=exited, exit_code=127"
+              ],
+              "category": "deterministic",
+              "exec_output_tail": {
+                "stderr": "/bin/bash: line 1: claude-agent-acp: command not found\n"
+              }
+            },
+            "usage": null
+          },
+          "repro.understand_report": {
+            "status": "failed",
+            "failure": {
+              "message": "ACP turn failed",
+              "causes": [
+                "ACP process exited before protocol completed: termination=exited, exit_code=127"
+              ],
+              "category": "deterministic",
+              "exec_output_tail": {
+                "stderr": "/bin/bash: line 1: claude-agent-acp: command not found\n"
+              }
+            },
+            "usage": null
+          },
+          "repro.bring_up_app": {
+            "status": "failed",
+            "failure": {
+              "message": "ACP turn failed",
+              "causes": [
+                "ACP process exited before protocol completed: termination=exited, exit_code=127"
+              ],
+              "category": "deterministic",
+              "exec_output_tail": {
+                "stderr": "/bin/bash: line 1: claude-agent-acp: command not found\n"
+              }
+            },
+            "usage": null
+          }
+        },
+        "next_node_id": "check_repro",
+        "git_commit_sha": "1635c3fcdc5f4db4decc78d2df13eb05808e415b",
+        "loop_failure_signatures": {
+          "repro.attempt_repro|deterministic|acp turn failed": 1,
+          "repro.bring_up_app|deterministic|acp turn failed": 1,
+          "repro.report_result|deterministic|acp turn failed": 1,
+          "understand_locate|deterministic|acp turn failed": 1,
+          "repro.understand_report|deterministic|acp turn failed": 1,
+          "repro.explore_variations|deterministic|acp turn failed": 1
+        },
+        "node_visits": {
+          "repro.report_result": 1,
+          "repro.understand_report": 1,
+          "repro.attempt_repro": 1,
+          "start": 1,
+          "understand_locate": 1,
+          "repro.bring_up_app": 1,
+          "repro.explore_variations": 1
+        }
+      },
+      "diff": {
+        "summary": {
+          "files_changed": 0,
+          "additions": 0,
+          "deletions": 0
+        }
+      }
+    },
+    {
+      "seq": 0,
+      "checkpoint": {
+        "timestamp": "2026-08-06T20:00:55.825068082Z",
+        "current_node": "check_repro",
+        "completed_nodes": [
+          "start",
+          "understand_locate",
+          "repro.understand_report",
+          "repro.bring_up_app",
+          "repro.attempt_repro",
+          "repro.explore_variations",
+          "repro.report_result",
+          "check_repro"
+        ],
+        "node_retries": {},
+        "context_values": {
+          "current_node": "check_repro",
           "internal.retry_count.repro.attempt_repro": 0,
           "internal.retry_count.repro.explore_variations": 0,
+          "thread.repro.report_result.current_node": "check_repro",
           "outcome": "failed",
+          "internal.retry_count.check_repro": 0,
           "internal.retry_count.understand_locate": 0,
           "graph.rankdir": "LR",
           "internal.run_id": "01KZCAK4457K0NSJW6ZJ7FK37Z",
@@ -10320,9 +10478,9 @@
           "internal.fidelity": "compact",
           "internal.node_visit_count": 1,
           "thread.fix-bug.current_node": "understand_locate",
-          "failure_signature": "repro.report_result|deterministic|acp turn failed",
+          "failure_signature": "check_repro|deterministic|acp turn failed",
           "internal.retry_count.repro.bring_up_app": 0,
-          "internal.thread_id": "repro",
+          "internal.thread_id": "repro.report_result",
           "failure_class": "deterministic",
           "internal.retry_count.repro.understand_report": 0
         },
@@ -10383,6 +10541,20 @@
             },
             "usage": null
           },
+          "check_repro": {
+            "status": "failed",
+            "failure": {
+              "message": "ACP turn failed",
+              "causes": [
+                "ACP process exited before protocol completed: termination=exited, exit_code=127"
+              ],
+              "category": "deterministic",
+              "exec_output_tail": {
+                "stderr": "/bin/bash: line 1: claude-agent-acp: command not found\n"
+              }
+            },
+            "usage": null
+          },
           "understand_locate": {
             "status": "failed",
             "failure": {
@@ -10416,11 +10588,12 @@
             "usage": null
           }
         },
-        "next_node_id": "check_repro",
+        "next_node_id": "cnr_report",
         "node_visits": {
-          "repro.bring_up_app": 1,
-          "understand_locate": 1,
           "start": 1,
+          "repro.bring_up_app": 1,
+          "check_repro": 1,
+          "understand_locate": 1,
           "repro.report_result": 1,
           "repro.attempt_repro": 1,
           "repro.explore_variations": 1,
@@ -10457,45 +10630,6 @@
   "superseded_by": null,
   "pending_interviews": {},
   "stages": {
-    "understand_locate@1": {
-      "first_event_seq": 22,
-      "prompt": null,
-      "response": null,
-      "completion": {
-        "outcome": "failed",
-        "notes": null,
-        "failure_reason": "ACP turn failed",
-        "timestamp": "2026-08-06T20:00:28.173530176Z"
-      },
-      "provider_used": {
-        "mode": "acp",
-        "provider": "acp"
-      },
-      "diff": null,
-      "script_invocation": null,
-      "script_timing": null,
-      "parallel_results": null,
-      "output": null,
-      "started_at": "2026-08-06T20:00:27.851210043Z",
-      "handler": "agent",
-      "graph_visit": 1,
-      "timing": {
-        "wall_time_ms": 315,
-        "inference_time_ms": 0,
-        "tool_time_ms": 0,
-        "active_time_ms": 0
-      },
-      "usage": {
-        "input_tokens": 0,
-        "output_tokens": 0,
-        "total_tokens": 0,
-        "reasoning_tokens": 0,
-        "cache_read_tokens": 0,
-        "cache_write_tokens": 0
-      },
-      "agent_control": "running",
-      "state": "failed"
-    },
     "repro.attempt_repro@1": {
       "first_event_seq": 58,
       "prompt": null,
@@ -10570,6 +10704,113 @@
       },
       "agent_control": "running",
       "state": "succeeded"
+    },
+    "repro.understand_report@1": {
+      "first_event_seq": 34,
+      "prompt": null,
+      "response": null,
+      "completion": {
+        "outcome": "failed",
+        "notes": null,
+        "failure_reason": "ACP turn failed",
+        "timestamp": "2026-08-06T20:00:32.843480544Z"
+      },
+      "provider_used": {
+        "mode": "acp",
+        "provider": "acp"
+      },
+      "diff": null,
+      "script_invocation": null,
+      "script_timing": null,
+      "parallel_results": null,
+      "output": null,
+      "started_at": "2026-08-06T20:00:32.613691536Z",
+      "handler": "agent",
+      "graph_visit": 1,
+      "timing": {
+        "wall_time_ms": 223,
+        "inference_time_ms": 0,
+        "tool_time_ms": 0,
+        "active_time_ms": 0
+      },
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_tokens": 0,
+        "reasoning_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      "agent_control": "running",
+      "state": "failed"
+    },
+    "check_repro@1": {
+      "first_event_seq": 94,
+      "prompt": null,
+      "response": null,
+      "completion": null,
+      "provider_used": {
+        "mode": "acp",
+        "provider": "acp"
+      },
+      "diff": null,
+      "script_invocation": null,
+      "script_timing": null,
+      "parallel_results": null,
+      "output": null,
+      "started_at": "2026-08-06T20:00:55.556789960Z",
+      "handler": "agent",
+      "graph_visit": 1,
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_tokens": 0,
+        "reasoning_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      "acp_started_at": "2026-08-06T20:00:55.556831902Z",
+      "agent_control": "running",
+      "state": "running"
+    },
+    "understand_locate@1": {
+      "first_event_seq": 22,
+      "prompt": null,
+      "response": null,
+      "completion": {
+        "outcome": "failed",
+        "notes": null,
+        "failure_reason": "ACP turn failed",
+        "timestamp": "2026-08-06T20:00:28.173530176Z"
+      },
+      "provider_used": {
+        "mode": "acp",
+        "provider": "acp"
+      },
+      "diff": null,
+      "script_invocation": null,
+      "script_timing": null,
+      "parallel_results": null,
+      "output": null,
+      "started_at": "2026-08-06T20:00:27.851210043Z",
+      "handler": "agent",
+      "graph_visit": 1,
+      "timing": {
+        "wall_time_ms": 315,
+        "inference_time_ms": 0,
+        "tool_time_ms": 0,
+        "active_time_ms": 0
+      },
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_tokens": 0,
+        "reasoning_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      "agent_control": "running",
+      "state": "failed"
     },
     "repro.explore_variations@1": {
       "first_event_seq": 70,
@@ -10649,15 +10890,15 @@
       "agent_control": "running",
       "state": "failed"
     },
-    "repro.understand_report@1": {
-      "first_event_seq": 34,
+    "repro.report_result@1": {
+      "first_event_seq": 82,
       "prompt": null,
       "response": null,
       "completion": {
         "outcome": "failed",
         "notes": null,
         "failure_reason": "ACP turn failed",
-        "timestamp": "2026-08-06T20:00:32.843480544Z"
+        "timestamp": "2026-08-06T20:00:51.281789812Z"
       },
       "provider_used": {
         "mode": "acp",
@@ -10668,11 +10909,11 @@
       "script_timing": null,
       "parallel_results": null,
       "output": null,
-      "started_at": "2026-08-06T20:00:32.613691536Z",
+      "started_at": "2026-08-06T20:00:51.059054448Z",
       "handler": "agent",
       "graph_visit": 1,
       "timing": {
-        "wall_time_ms": 223,
+        "wall_time_ms": 217,
         "inference_time_ms": 0,
         "tool_time_ms": 0,
         "active_time_ms": 0
@@ -10687,35 +10928,6 @@
       },
       "agent_control": "running",
       "state": "failed"
-    },
-    "repro.report_result@1": {
-      "first_event_seq": 82,
-      "prompt": null,
-      "response": null,
-      "completion": null,
-      "provider_used": {
-        "mode": "acp",
-        "provider": "acp"
-      },
-      "diff": null,
-      "script_invocation": null,
-      "script_timing": null,
-      "parallel_results": null,
-      "output": null,
-      "started_at": "2026-08-06T20:00:51.059054448Z",
-      "handler": "agent",
-      "graph_visit": 1,
-      "usage": {
-        "input_tokens": 0,
-        "output_tokens": 0,
-        "total_tokens": 0,
-        "reasoning_tokens": 0,
-        "cache_read_tokens": 0,
-        "cache_write_tokens": 0
-      },
-      "acp_started_at": "2026-08-06T20:00:51.059150068Z",
-      "agent_control": "running",
-      "state": "running"
     }
   }
 }
