@@ -1,0 +1,28 @@
+diff --git a/.facto/bug-brief.md b/.facto/bug-brief.md
+index d38cc0a..906a6b4 100644
+--- a/.facto/bug-brief.md
++++ b/.facto/bug-brief.md
+@@ -13,7 +13,22 @@ Secondary text in CLI tables is hardcoded to `Color::Ansi256(8)` ("bright black"
+ `fabro` CLI table rendering, under `lib/apps/fabro-cli/src/commands/`. Reporter names: `runs/list.rs`, `model.rs`, `workflow/list.rs`, `run/checkpoints.rs`. Also references the shared styling primitive at `lib/foundation/fabro-util/src/terminal.rs` (`Styles::dim`).
+ 
+ ## Code locations
+-Unknown — not verified at this stage (locating and confirming code is a job of later stages). The reporter's claimed locations are recorded verbatim below under Reported hypothesis for the diagnosis stage to verify.
++All ten of the reporter's claimed occurrences were read and confirmed exact — every cited line is `Color::Ansi256(8)` used as a secondary/dim foreground color (or, in two `runs/list.rs` cases, as a status color plus a bold-suppression condition keyed off it). No additional occurrences were found; `rg -n "Ansi256\(8\)" lib/apps/fabro-cli/src` returns exactly these ten hits across these four files.
++
++- `lib/apps/fabro-cli/src/commands/runs/list.rs`
++  - `fn list_command` (lines 18–169), row-building closure: line 128 (RUN ID cell), line 138 (PARENT cell), line 148 (GOAL cell) — each `.foreground_color(color_if(use_color, Color::Ansi256(8)))`.
++  - `fn status_cell` (lines 171–186): line 178 — `Color::Ansi256(8)` used as the STATUS color for `RunStatus::Submitted | Pending | Dead`; line 184 — `.bold(use_color && color != Some(Color::Ansi256(8)))` suppresses bold specifically when the color is `Ansi256(8)`; line 185 — the STATUS cell's `foreground_color`, defaulting to `Ansi256(8)`. This is the case the reporter flagged as most severe: for those three statuses, the status is conveyed *only* by a color that is unreadable on a dark theme.
++- `lib/apps/fabro-cli/src/commands/model.rs`
++  - `fn model_row` (lines 122–148): line 135 (PROVIDER cell), line 138 (ALIASES cell) — same `.foreground_color(color_if(use_color, Color::Ansi256(8)))` pattern.
++  - Note: this file defines its own private `color_if` (lines 110–112), duplicating `crate::shared::utilities::color_if` (`lib/apps/fabro-cli/src/shared/utilities.rs:166`) used by the other three files. Not itself the bug, but relevant if the fix touches `color_if`'s signature or a shared helper is introduced.
++- `lib/apps/fabro-cli/src/commands/workflow/list.rs`
++  - `fn print_section` (lines 74–136): line 113 — DESCRIPTION cell, `.foreground_color(color_if(use_color, Color::Ansi256(8)))`. Confirmed the reporter's note: this same function already calls `styles.dim.apply_to(...)` for the section title's path suffix (line 85) and the "(none)" placeholder (line 88) — i.e. the terminal-relative primitive is already in scope in this exact function, just not applied to the table cell two lines later.
++- `lib/apps/fabro-cli/src/commands/run/checkpoints.rs`
++  - `fn print_timeline` (lines 55–118): line 93 — Details cell, `.foreground_color(color_if(use_color, Color::Ansi256(8)))`.
++
++Shared primitive: `fabro_util::terminal::Styles::dim` at `lib/foundation/fabro-util/src/terminal.rs:28` — `Style::new().dim().force_styling(use_color)`, a `console::Style` (SGR 2 "faint" against the terminal's own foreground), confirmed to already exist and already be threaded into three of these four files via a `styles: &Styles` parameter (`model.rs`'s `print_models_table`/`test_models_via_server`, `workflow/list.rs`'s `list_command`/`print_section`, `run/checkpoints.rs`'s `print_timeline` all already receive `&Styles`). `runs/list.rs::list_command` also already receives `styles: &Styles` as a parameter (line 20) but only reads `styles.use_color` from it, not `styles.dim`.
++
++Still open (the reporter's stated open question, unresolved by this stage — no local cargo registry cache was available to inspect `cli-table` 0.5 source, so this is deferred to diagnosis/fix): whether `cli_table::CellStruct` exposes a faint/dim attribute the way it exposes `.bold(bool)`, and whether `cli-table`'s column-width measurement counts embedded ANSI escapes if the alternative of pre-styling the string before `.cell()` is used instead.
+ 
+ ## Preconditions, inputs and environment
+ - A terminal emulator/profile configured with a dark background theme.
