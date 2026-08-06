@@ -108,9 +108,7 @@ fn print_section(
                     .clone()
                     .cell()
                     .foreground_color(color_if(use_color, Color::Cyan)),
-                goal_str
-                    .cell()
-                    .foreground_color(color_if(use_color, Color::Ansi256(8))),
+                goal_str.cell().dimmed(use_color),
             ]
         })
         .collect();

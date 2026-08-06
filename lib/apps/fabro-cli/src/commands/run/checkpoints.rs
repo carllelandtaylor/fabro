@@ -88,9 +88,7 @@ pub(crate) fn print_timeline(entries: &[TimelineEntryJson], styles: &Styles, pri
                     .cell()
                     .foreground_color(color_if(use_color, Color::Cyan)),
                 entry.node_name.clone().cell(),
-                detail_str
-                    .cell()
-                    .foreground_color(color_if(use_color, Color::Ansi256(8))),
+                detail_str.cell().dimmed(use_color),
             ]
         })
         .collect();

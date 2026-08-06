@@ -128,14 +128,8 @@ fn model_row(model: &Model, use_color: bool) -> Vec<CellStruct> {
     );
     vec![
         model.id.as_str().cell().bold(use_color),
-        model
-            .provider
-            .as_str()
-            .cell()
-            .foreground_color(color_if(use_color, Color::Ansi256(8))),
-        aliases
-            .cell()
-            .foreground_color(color_if(use_color, Color::Ansi256(8))),
+        model.provider.as_str().cell().dimmed(use_color),
+        aliases.cell().dimmed(use_color),
         format_context_window(model.limits.context_window)
             .cell()
             .justify(Justify::Right),

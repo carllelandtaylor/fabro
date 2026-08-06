@@ -122,30 +122,20 @@ pub(crate) async fn list_command(
                 .map_or_else(|| "-".to_string(), |p| tilde_path(Path::new(p)));
             let run_id = run.run_id().to_string();
 
-            let mut row = vec![
-                short_run_id(&run_id)
-                    .cell()
-                    .foreground_color(color_if(use_color, Color::Ansi256(8))),
-            ];
+            let mut row = vec![short_run_id(&run_id).cell().dimmed(use_color)];
             if show_parent_column {
                 let parent_display = run.parent_id().map_or_else(
                     || "-".to_string(),
                     |parent_id| short_run_id(&parent_id.to_string()).to_string(),
                 );
-                row.push(
-                    parent_display
-                        .cell()
-                        .foreground_color(color_if(use_color, Color::Ansi256(8))),
-                );
+                row.push(parent_display.cell().dimmed(use_color));
             }
             row.extend([
                 run.workflow_display_name().cell(),
                 status_cell(run.status(), use_color),
                 dir_display.cell(),
                 duration_display.cell(),
-                truncate_goal(&run.goal(), 50)
-                    .cell()
-                    .foreground_color(color_if(use_color, Color::Ansi256(8))),
+                truncate_goal(&run.goal(), 50).cell().dimmed(use_color),
             ]);
             row
         })
@@ -174,15 +164,17 @@ fn status_cell(status: RunStatus, use_color: bool) -> CellStruct {
         RunStatus::Succeeded { .. } => Some(Color::Green),
         RunStatus::Failed { .. } => Some(Color::Red),
         RunStatus::Running | RunStatus::Starting | RunStatus::Runnable => Some(Color::Cyan),
-        RunStatus::Submitted | RunStatus::Pending { .. } | RunStatus::Dead => {
-            Some(Color::Ansi256(8))
-        }
+        RunStatus::Submitted | RunStatus::Pending { .. } | RunStatus::Dead => None,
         RunStatus::Blocked { .. } | RunStatus::Removing => Some(Color::Yellow),
         RunStatus::Paused { .. } => Some(Color::Magenta),
     };
-    text.cell()
-        .bold(use_color && color != Some(Color::Ansi256(8)))
-        .foreground_color(color_if(use_color, color.unwrap_or(Color::Ansi256(8))))
+    match color {
+        Some(color) => text
+            .cell()
+            .bold(use_color)
+            .foreground_color(color_if(use_color, color)),
+        None => text.cell().dimmed(use_color),
+    }
 }
 
 fn parse_label_filters(label_args: &[String]) -> Vec<(String, String)> {
@@ -209,6 +201,40 @@ fn truncate_str(s: &str, max_len: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn status_cell_dims_muted_statuses_instead_of_fixed_grey() {
+        for status in [RunStatus::Submitted, RunStatus::Dead] {
+            let rendered = vec![vec![status_cell(status, true)]]
+                .table()
+                .color_choice(cli_table::ColorChoice::Always)
+                .display()
+                .unwrap()
+                .to_string();
+            assert!(
+                rendered.contains("\u{1b}[2m"),
+                "expected dim SGR (faint) code for {status:?}, got: {rendered:?}"
+            );
+            assert!(
+                !rendered.contains("\u{1b}[38;5;8m"),
+                "must not use fixed Ansi256(8) grey for {status:?}, got: {rendered:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn status_cell_keeps_explicit_color_for_active_statuses() {
+        let rendered = vec![vec![status_cell(RunStatus::Runnable, true)]]
+            .table()
+            .color_choice(cli_table::ColorChoice::Always)
+            .display()
+            .unwrap()
+            .to_string();
+        assert!(
+            !rendered.contains("\u{1b}[2m"),
+            "active statuses should use color, not dim: {rendered:?}"
+        );
+    }
 
     #[test]
     fn truncate_goal_strips_markdown_headings() {
