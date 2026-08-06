@@ -11196,7 +11196,7 @@
     "kind": "running"
   },
   "status_updated_at": "2026-08-06T23:17:42.746161670Z",
-  "last_event_at": "2026-08-06T23:37:05.886577841Z",
+  "last_event_at": "2026-08-06T23:38:03.063640821Z",
   "pending_control": null,
   "checkpoints": [
     {
@@ -11658,9 +11658,9 @@
       }
     },
     {
-      "seq": 0,
+      "seq": 89,
       "checkpoint": {
-        "timestamp": "2026-08-06T23:37:05.917426116Z",
+        "timestamp": "2026-08-06T23:37:09.375122846Z",
         "current_node": "repro.confirm_distill",
         "completed_nodes": [
           "start",
@@ -11672,15 +11672,176 @@
         ],
         "node_retries": {},
         "context_values": {
+          "thread.start.current_node": "understand_locate",
+          "graph.rankdir": "LR",
+          "last_stage": "repro.confirm_distill",
+          "graph.thread_id": "fix-bug",
+          "response.understand_locate": "Now writing the brief from the report content only, without touching the rest of the codebase.`.facto/bug-brief.md` is written. Summary:\n\n**Filled in:** Report source, Expected behavior, Actual behavior, Affected area, Reported hypothesis (verbatim reporter claims, including the claimed file/line table, the `cli-table` open question, and the \"no existing test\" note).\n\n**Left `Unknown`:** Code locations (verifying them is a later stage's job, per instructions — the reporter's claimed table is preserved under Reported hypothesis instead), Preconditions/environment (partially filled, but exact terminal/theme unspecified), Reproduction steps (inferred general steps only, no exact captured transcript in the report), Evidence (none was provided — no screenshots/logs/output), Root cause (diagnosis stage's job).\n\n**Fix constraints:** recorded the reporter's open technical question plus the standing workflow constraints (fix root cause, don't weaken functionality, add a regression test).\n\n**Optional status write:** skipped with a warning — `facto-helper.sh` is not present anywhere on this machine, and the report is free text with no associated issue number, so there's no tracker item to update.",
+          "internal.thread_id": "fix-bug.repro",
+          "internal.fidelity": "summary:high",
+          "failure_signature": "",
+          "failure_class": "",
+          "internal.retry_count.repro.understand_report": 0,
+          "internal.retry_count.start": 0,
+          "internal.retry_count.repro.confirm_distill": 0,
+          "response.repro.understand_report": "I'll verify the reporter's claimed code locations by reading the actual files, since the brief currently leaves \"Code locations\" as Unknown.All ten claimed locations check out exactly. Let me also verify the `cli-table` crate version and API surface to resolve the reporter's open question about dim attribute support.All confirmed. Now updating the bug brief with verified code locations.Verified all ten of the reporter's claimed occurrences and updated `.facto/bug-brief.md` in place.\n\n**Affected area:** `fabro` CLI table rendering in `lib/apps/fabro-cli/src/commands/` — `runs/list.rs`, `model.rs`, `workflow/list.rs`, `run/checkpoints.rs` — plus the shared styling primitive `fabro_util::terminal::Styles` (`lib/foundation/fabro-util/src/terminal.rs`).\n\n**Traced and confirmed exact** (via `rg -n \"Ansi256\\(8\\)\" lib/apps/fabro-cli/src`, which returns precisely these ten hits, no more):\n- `runs/list.rs`: `list_command` (lines 128, 138, 148 — RUN ID/PARENT/GOAL cells) and `status_cell` (lines 178, 184, 185 — status color, bold-suppression, and default color, the most severe case since status becomes unreadable-only)\n- `model.rs`: `model_row` (lines 135, 138 — PROVIDER/ALIASES cells); also noted this file has its own private `color_if` duplicating the shared one in `shared/utilities.rs:166`\n- `workflow/list.rs`: `print_section` (line 113 — DESCRIPTION cell); confirmed `styles.dim` is already used two lines earlier in the same function for the section header, just not applied to the table cell\n- `run/checkpoints.rs`: `print_timeline` (line 93 — Details cell)\n- `Styles::dim` at `terminal.rs:28`, and confirmed three of the four files already carry a `&Styles` parameter into scope (`runs/list.rs` does too, but only reads `.use_color` from it)\n\n**Still `Unknown` in the brief:** exact reproduction transcript/terminal emulator (reporter never gave one), Evidence (no screenshots/logs provided), Root cause (diagnosis stage's job), and the reporter's open technical question about whether `cli-table` 0.5's `CellStruct` supports a dim attribute — I couldn't inspect the crate source locally (no cargo registry cache present), so that's deferred to diagnosis/fix.",
           "graph.goal": "Fix a reported bug end-to-end and autonomously: reproduce it, diagnose the real root cause, fix it with adaptive escalation, verify against the logged repro steps, open a pull request, and drive CI to green",
+          "outcome": "succeeded",
+          "thread.fix-bug.repro.current_node": "repro.confirm_distill",
+          "current_node": "repro.confirm_distill",
+          "internal.retry_count.understand_locate": 0,
           "last_response": "I'll read the current bug brief to see what's already documented before refining it into a minimal repeatable repro sequence.Reproduced reliably a third time. Now I'll update the bug brief with the mi",
+          "internal.retry_count.repro.bring_up_app": 0,
+          "internal.node_visit_count": 1,
+          "internal.run_id": "01KZCNWCW1GV00S1Q28JJN472Y",
+          "internal.work_dir": "/workspace/fabro",
+          "internal.retry_count.repro.attempt_repro": 0,
+          "response.repro.attempt_repro": "The `repro.bring_up_app` stage is already complete — it's committed as `6d0c237` and the working tree is clean with no uncommitted changes.\n\nChecking `.facto/bug-brief.md`, the reproduction was already performed and recorded in full:\n\n- Built `fabro-cli` and ran `TERM=xterm-256color CLICOLOR_FORCE=1 ./target/debug/fabro workflow list` under a pty\n- Observed the exact symptom: the DESCRIPTION cell emits literal `\\x1b[38;5;8m` (absolute 256-color palette index 8), contrasted against the adjacent NAME cell's `\\x1b[36m` — confirming the hardcoded `Color::Ansi256(8)` reaches the output stream exactly as the reporter described, and that this isn't a global color-suppression artifact\n- Resolved the reporter's open technical question by reading the `cli-table` 0.5.0 and `termcolor` 1.4.1 crate sources: `CellStruct` already exposes `.dimmed(bool)` (via the `Style` trait, already imported in all four affected files), which emits SGR 2 \"faint\" — a terminal-relative attribute — with no ANSI-in-column-width concern\n- Noted `fabro ps` (the `runs/list.rs` STATUS-color case) couldn't be driven live (needs a running server), so it was verified statically only\n\nThe brief's Root cause section is correctly left `Unknown` for the diagnosis stage, and all other established facts (preconditions, reproduction steps, evidence, code locations) are filled in. Nothing further is needed for this stage — it's already succeeded and persisted.",
+          "response.repro.bring_up_app": "Now let's build the CLI and reproduce the bug with `fabro workflow list`.I'll wait for the background build to finish before driving the CLI.I'll just wait for the background build notification instead of polling.The `cargo build -p fabro-cli` command is running in the background; I'll wait for it to finish before driving the CLI.While the build compiles in the background, let me inspect the relevant source and the `cli-table` crate to resolve the reporter's open technical question.Excellent — `cli-table`'s `Style` trait exposes `.dimmed(bool)`, using `termcolor`'s `ColorSpec::set_dimmed`, which emits SGR 2 (faint) rather than an absolute color. This resolves the reporter's open question cleanly: no foreground color needed, no ANSI-in-column-width concern. Let me confirm `termcolor` actually emits SGR 2 for dimmed.Now let's check the `color_if` helper and `Styles::dim` definitions to plan the fix precisely.Good — `Style` trait is implemented for `CellStruct` and exposes `.dimmed(bool)`. Now let's check current imports in the affected files to know what needs adding.All four files already import `cli_table::Style`, so `.dimmed(bool)` is available with no new imports. Let me check the background build.Good, all the sites are clear now. Let's check on the build.Still compiling many dependencies from a fresh build. I'll wait for the background build task notification rather than continuing to poll manually.The `fabro-cli` build is compiling a large dependency tree; I'll wait for the background task notification rather than polling further.Build is still in progress. I'll stop polling and wait for the automatic notification when it finishes.The build finished successfully. Now let's reproduce the bug by running `fabro workflow list` and inspecting the raw ANSI output.`CLICOLOR_FORCE=1` will force color regardless of tty. Let's reproduce with that.`TERM=dumb` in this environment — that's why cli-table's `ColorChoice::Auto` suppressed the table body colors. Let's force `TERM` too.`fabro ps` is the hidden command that maps to `runs/list.rs`. Let's try it.I have solid reproduction evidence. Let me update the bug brief with these findings before finishing this stage.The bug brief is updated with the reproduction findings. Summary of what I confirmed:\n\n**Driver chosen:** CLI, run directly (this is a terminal color-rendering bug, no web/GUI involved). No project-specific \"run\" skill exists for launching the app, so I built `fabro-cli` (`cargo build -p fabro-cli`) and ran the resulting binary directly.\n\n**What I confirmed:**\n- Reproduced the exact mechanism: `fabro workflow list` emits literal `\\x1b[38;5;8m` (SGR \"set foreground to 256-color palette index 8\") around the DESCRIPTION cell — exactly `Color::Ansi256(8)` as reported — contrasted against the adjacent NAME cell's plain `\\x1b[36m` cyan, confirming color styling reaches output correctly and this specific escape is the bug, not a global suppression artifact.\n- Discovered and documented the two independent color-enablement gates in play (`console::colors_enabled_stderr()` for the pre-styled title text, and `cli_table`'s env-based — not tty-based — `ColorChoice::Auto`), which was needed to get color output at all in this sandboxed/no-real-tty environment.\n- Resolved the reporter's open technical question by reading the `cli-table` 0.5.0 and `termcolor` 1.4.1 crate sources: `CellStruct` already exposes `.dimmed(bool)` (all four affected files already import the `Style` trait), which emits SGR 2 (`\\x1b[2m`, terminal-relative \"faint\") via structured `ColorSpec` — no ANSI-in-cell-width concern, since nothing needs to be pre-styled into the string before `.cell()`.\n- `fabro ps` (the `runs/list.rs` command) requires a running server not available here, so it was verified statically only, not driven live.\n\nThis gives the fix stage a clear, low-risk path: replace each `.foreground_color(color_if(use_color, Color::Ansi256(8)))` with `.dimmed(use_color)`.",
+          "response.repro.confirm_distill": "I'll read the current bug brief to see what's already documented before refining it into a minimal repeatable repro sequence.Reproduced reliably a third time. Now I'll update the bug brief with the minimized, precisely-formatted repro sequence and confirmation evidence.Both goals are met: the bug reliably reproduces (confirmed 3/3 identical runs) and the minimal repeatable sequence is logged in `.facto/bug-brief.md` — one build command plus a single `fabro workflow list` invocation, with explicit preconditions, ordered actions, observed-vs-expected output, and captured evidence (`/tmp/wf_list_raw.txt`, `/tmp/repro_confirm.txt`).The change to `.facto/bug-brief.md` is staged. Consistent with the pattern in the git log (each stage's commit is created automatically by the pipeline, named after the stage), I've left it staged rather than committing manually — the pipeline will commit as `repro.attempt_repro (succeeded)`."
+        },
+        "node_outcomes": {
+          "repro.confirm_distill": {
+            "status": "succeeded",
+            "context_updates": {
+              "response.repro.confirm_distill": "I'll read the current bug brief to see what's already documented before refining it into a minimal repeatable repro sequence.Reproduced reliably a third time. Now I'll update the bug brief with the minimized, precisely-formatted repro sequence and confirmation evidence.Both goals are met: the bug reliably reproduces (confirmed 3/3 identical runs) and the minimal repeatable sequence is logged in `.facto/bug-brief.md` — one build command plus a single `fabro workflow list` invocation, with explicit preconditions, ordered actions, observed-vs-expected output, and captured evidence (`/tmp/wf_list_raw.txt`, `/tmp/repro_confirm.txt`).The change to `.facto/bug-brief.md` is staged. Consistent with the pattern in the git log (each stage's commit is created automatically by the pipeline, named after the stage), I've left it staged rather than committing manually — the pipeline will commit as `repro.attempt_repro (succeeded)`.",
+              "last_response": "I'll read the current bug brief to see what's already documented before refining it into a minimal repeatable repro sequence.Reproduced reliably a third time. Now I'll update the bug brief with the mi",
+              "last_stage": "repro.confirm_distill"
+            },
+            "notes": "Stage completed: repro.confirm_distill",
+            "usage": null,
+            "timing": {
+              "wall_time_ms": 0,
+              "inference_time_ms": 87974,
+              "tool_time_ms": 0,
+              "active_time_ms": 87974
+            }
+          },
+          "repro.attempt_repro": {
+            "status": "succeeded",
+            "context_updates": {
+              "last_stage": "repro.attempt_repro",
+              "last_response": "The `repro.bring_up_app` stage is already complete — it's committed as `6d0c237` and the working tree is clean with no uncommitted changes.\n\nChecking `.facto/bug-brief.md`, the reproduction was alre",
+              "response.repro.attempt_repro": "The `repro.bring_up_app` stage is already complete — it's committed as `6d0c237` and the working tree is clean with no uncommitted changes.\n\nChecking `.facto/bug-brief.md`, the reproduction was already performed and recorded in full:\n\n- Built `fabro-cli` and ran `TERM=xterm-256color CLICOLOR_FORCE=1 ./target/debug/fabro workflow list` under a pty\n- Observed the exact symptom: the DESCRIPTION cell emits literal `\\x1b[38;5;8m` (absolute 256-color palette index 8), contrasted against the adjacent NAME cell's `\\x1b[36m` — confirming the hardcoded `Color::Ansi256(8)` reaches the output stream exactly as the reporter described, and that this isn't a global color-suppression artifact\n- Resolved the reporter's open technical question by reading the `cli-table` 0.5.0 and `termcolor` 1.4.1 crate sources: `CellStruct` already exposes `.dimmed(bool)` (via the `Style` trait, already imported in all four affected files), which emits SGR 2 \"faint\" — a terminal-relative attribute — with no ANSI-in-column-width concern\n- Noted `fabro ps` (the `runs/list.rs` STATUS-color case) couldn't be driven live (needs a running server), so it was verified statically only\n\nThe brief's Root cause section is correctly left `Unknown` for the diagnosis stage, and all other established facts (preconditions, reproduction steps, evidence, code locations) are filled in. Nothing further is needed for this stage — it's already succeeded and persisted."
+            },
+            "notes": "Stage completed: repro.attempt_repro",
+            "usage": null,
+            "timing": {
+              "wall_time_ms": 0,
+              "inference_time_ms": 29194,
+              "tool_time_ms": 0,
+              "active_time_ms": 29194
+            }
+          },
+          "repro.understand_report": {
+            "status": "succeeded",
+            "context_updates": {
+              "last_response": "I'll verify the reporter's claimed code locations by reading the actual files, since the brief currently leaves \"Code locations\" as Unknown.All ten claimed locations check out exactly. Let me also ver",
+              "response.repro.understand_report": "I'll verify the reporter's claimed code locations by reading the actual files, since the brief currently leaves \"Code locations\" as Unknown.All ten claimed locations check out exactly. Let me also verify the `cli-table` crate version and API surface to resolve the reporter's open question about dim attribute support.All confirmed. Now updating the bug brief with verified code locations.Verified all ten of the reporter's claimed occurrences and updated `.facto/bug-brief.md` in place.\n\n**Affected area:** `fabro` CLI table rendering in `lib/apps/fabro-cli/src/commands/` — `runs/list.rs`, `model.rs`, `workflow/list.rs`, `run/checkpoints.rs` — plus the shared styling primitive `fabro_util::terminal::Styles` (`lib/foundation/fabro-util/src/terminal.rs`).\n\n**Traced and confirmed exact** (via `rg -n \"Ansi256\\(8\\)\" lib/apps/fabro-cli/src`, which returns precisely these ten hits, no more):\n- `runs/list.rs`: `list_command` (lines 128, 138, 148 — RUN ID/PARENT/GOAL cells) and `status_cell` (lines 178, 184, 185 — status color, bold-suppression, and default color, the most severe case since status becomes unreadable-only)\n- `model.rs`: `model_row` (lines 135, 138 — PROVIDER/ALIASES cells); also noted this file has its own private `color_if` duplicating the shared one in `shared/utilities.rs:166`\n- `workflow/list.rs`: `print_section` (line 113 — DESCRIPTION cell); confirmed `styles.dim` is already used two lines earlier in the same function for the section header, just not applied to the table cell\n- `run/checkpoints.rs`: `print_timeline` (line 93 — Details cell)\n- `Styles::dim` at `terminal.rs:28`, and confirmed three of the four files already carry a `&Styles` parameter into scope (`runs/list.rs` does too, but only reads `.use_color` from it)\n\n**Still `Unknown` in the brief:** exact reproduction transcript/terminal emulator (reporter never gave one), Evidence (no screenshots/logs provided), Root cause (diagnosis stage's job), and the reporter's open technical question about whether `cli-table` 0.5's `CellStruct` supports a dim attribute — I couldn't inspect the crate source locally (no cargo registry cache present), so that's deferred to diagnosis/fix.",
+              "last_stage": "repro.understand_report"
+            },
+            "notes": "Stage completed: repro.understand_report",
+            "usage": null,
+            "files_touched": [
+              ".facto/bug-brief.md"
+            ],
+            "timing": {
+              "wall_time_ms": 0,
+              "inference_time_ms": 96552,
+              "tool_time_ms": 0,
+              "active_time_ms": 96552
+            }
+          },
+          "start": {
+            "status": "succeeded",
+            "usage": null
+          },
+          "understand_locate": {
+            "status": "succeeded",
+            "context_updates": {
+              "last_response": "Now writing the brief from the report content only, without touching the rest of the codebase.`.facto/bug-brief.md` is written. Summary:\n\n**Filled in:** Report source, Expected behavior, Actual behavi",
+              "response.understand_locate": "Now writing the brief from the report content only, without touching the rest of the codebase.`.facto/bug-brief.md` is written. Summary:\n\n**Filled in:** Report source, Expected behavior, Actual behavior, Affected area, Reported hypothesis (verbatim reporter claims, including the claimed file/line table, the `cli-table` open question, and the \"no existing test\" note).\n\n**Left `Unknown`:** Code locations (verifying them is a later stage's job, per instructions — the reporter's claimed table is preserved under Reported hypothesis instead), Preconditions/environment (partially filled, but exact terminal/theme unspecified), Reproduction steps (inferred general steps only, no exact captured transcript in the report), Evidence (none was provided — no screenshots/logs/output), Root cause (diagnosis stage's job).\n\n**Fix constraints:** recorded the reporter's open technical question plus the standing workflow constraints (fix root cause, don't weaken functionality, add a regression test).\n\n**Optional status write:** skipped with a warning — `facto-helper.sh` is not present anywhere on this machine, and the report is free text with no associated issue number, so there's no tracker item to update.",
+              "last_stage": "understand_locate"
+            },
+            "notes": "Stage completed: understand_locate",
+            "usage": null,
+            "files_touched": [
+              ".facto/bug-brief.md"
+            ],
+            "timing": {
+              "wall_time_ms": 0,
+              "inference_time_ms": 52387,
+              "tool_time_ms": 0,
+              "active_time_ms": 52387
+            }
+          },
+          "repro.bring_up_app": {
+            "status": "succeeded",
+            "context_updates": {
+              "last_response": "Now let's build the CLI and reproduce the bug with `fabro workflow list`.I'll wait for the background build to finish before driving the CLI.I'll just wait for the background build notification instea",
+              "last_stage": "repro.bring_up_app",
+              "response.repro.bring_up_app": "Now let's build the CLI and reproduce the bug with `fabro workflow list`.I'll wait for the background build to finish before driving the CLI.I'll just wait for the background build notification instead of polling.The `cargo build -p fabro-cli` command is running in the background; I'll wait for it to finish before driving the CLI.While the build compiles in the background, let me inspect the relevant source and the `cli-table` crate to resolve the reporter's open technical question.Excellent — `cli-table`'s `Style` trait exposes `.dimmed(bool)`, using `termcolor`'s `ColorSpec::set_dimmed`, which emits SGR 2 (faint) rather than an absolute color. This resolves the reporter's open question cleanly: no foreground color needed, no ANSI-in-column-width concern. Let me confirm `termcolor` actually emits SGR 2 for dimmed.Now let's check the `color_if` helper and `Styles::dim` definitions to plan the fix precisely.Good — `Style` trait is implemented for `CellStruct` and exposes `.dimmed(bool)`. Now let's check current imports in the affected files to know what needs adding.All four files already import `cli_table::Style`, so `.dimmed(bool)` is available with no new imports. Let me check the background build.Good, all the sites are clear now. Let's check on the build.Still compiling many dependencies from a fresh build. I'll wait for the background build task notification rather than continuing to poll manually.The `fabro-cli` build is compiling a large dependency tree; I'll wait for the background task notification rather than polling further.Build is still in progress. I'll stop polling and wait for the automatic notification when it finishes.The build finished successfully. Now let's reproduce the bug by running `fabro workflow list` and inspecting the raw ANSI output.`CLICOLOR_FORCE=1` will force color regardless of tty. Let's reproduce with that.`TERM=dumb` in this environment — that's why cli-table's `ColorChoice::Auto` suppressed the table body colors. Let's force `TERM` too.`fabro ps` is the hidden command that maps to `runs/list.rs`. Let's try it.I have solid reproduction evidence. Let me update the bug brief with these findings before finishing this stage.The bug brief is updated with the reproduction findings. Summary of what I confirmed:\n\n**Driver chosen:** CLI, run directly (this is a terminal color-rendering bug, no web/GUI involved). No project-specific \"run\" skill exists for launching the app, so I built `fabro-cli` (`cargo build -p fabro-cli`) and ran the resulting binary directly.\n\n**What I confirmed:**\n- Reproduced the exact mechanism: `fabro workflow list` emits literal `\\x1b[38;5;8m` (SGR \"set foreground to 256-color palette index 8\") around the DESCRIPTION cell — exactly `Color::Ansi256(8)` as reported — contrasted against the adjacent NAME cell's plain `\\x1b[36m` cyan, confirming color styling reaches output correctly and this specific escape is the bug, not a global suppression artifact.\n- Discovered and documented the two independent color-enablement gates in play (`console::colors_enabled_stderr()` for the pre-styled title text, and `cli_table`'s env-based — not tty-based — `ColorChoice::Auto`), which was needed to get color output at all in this sandboxed/no-real-tty environment.\n- Resolved the reporter's open technical question by reading the `cli-table` 0.5.0 and `termcolor` 1.4.1 crate sources: `CellStruct` already exposes `.dimmed(bool)` (all four affected files already import the `Style` trait), which emits SGR 2 (`\\x1b[2m`, terminal-relative \"faint\") via structured `ColorSpec` — no ANSI-in-cell-width concern, since nothing needs to be pre-styled into the string before `.cell()`.\n- `fabro ps` (the `runs/list.rs` command) requires a running server not available here, so it was verified statically only, not driven live.\n\nThis gives the fix stage a clear, low-risk path: replace each `.foreground_color(color_if(use_color, Color::Ansi256(8)))` with `.dimmed(use_color)`."
+            },
+            "notes": "Stage completed: repro.bring_up_app",
+            "usage": null,
+            "files_touched": [
+              ".facto/bug-brief.md"
+            ],
+            "timing": {
+              "wall_time_ms": 0,
+              "inference_time_ms": 871798,
+              "tool_time_ms": 0,
+              "active_time_ms": 871798
+            }
+          }
+        },
+        "next_node_id": "repro.report_result",
+        "git_commit_sha": "8ffbf0b3d0c7233176e6c416bbfc574b4ecdf8f2",
+        "node_visits": {
+          "repro.confirm_distill": 1,
+          "understand_locate": 1,
+          "repro.bring_up_app": 1,
+          "start": 1,
+          "repro.attempt_repro": 1,
+          "repro.understand_report": 1
+        }
+      },
+      "diff": {
+        "patch": "diff --git a/.facto/bug-brief.md b/.facto/bug-brief.md\nindex d9b410b..e9b5b70 100644\n--- a/.facto/bug-brief.md\n+++ b/.facto/bug-brief.md\n@@ -35,21 +35,43 @@ Still open (the reporter's stated open question, unresolved by this stage — no\n - Color output enabled. Confirmed by driving the actual built binary: `Styles::detect_stderr()` (used by `workflow list.rs`) calls `console::colors_enabled_stderr()`, which is gated on `env::var(\"CLICOLOR_FORCE\")` (or a real stderr tty) — plain piping/no-tty disables it. Separately and *in addition*, `cli_table`'s own `ColorChoice::Auto` (set from the same `use_color` bool at each call site) is gated on `termcolor`'s `env_allows_color()`, which checks `TERM` (must not be unset/`\"dumb\"`) and `NO_COLOR` (must be unset) — this check is not tty-based at all, it's pure env var. Both gates must pass for table-body ANSI color to actually appear in the output stream. Reproduced by running the built CLI with `TERM=xterm-256color CLICOLOR_FORCE=1` under a `script`-allocated pty.\n - Reporter did not specify a particular OS, shell, or terminal emulator — general \"dark terminal theme\" is the stated condition. Not needed for repro: the emitted SGR sequence is visible/verifiable directly in captured output without an actual dark-background display.\n \n-## Reproduction steps\n-Executed directly (CLI driver, no UI needed) against the current branch build:\n-1. `cargo build -p fabro-cli` (binary at `target/debug/fabro`).\n-2. `TERM=xterm-256color CLICOLOR_FORCE=1 ./target/debug/fabro workflow list 2>&1 | cat -v` (pty allocated via `script -qec ... /tmp/wf_list_raw.txt` gives an identical result; a real pty is not even required here since `cli_table`'s Auto gate is env-based, not tty-based, per above).\n-3. Observed output for the DESCRIPTION column of every project-workflow row: `^[[0m^[[0m ^[[0m^[[0m^[[0m^[[38;5;8m           ^[[0m ^[[0m` — i.e. literal escape `\\x1b[38;5;8m` (SGR \"set foreground to 256-color palette index 8\") wraps the cell content exactly as the reporter claimed for `Color::Ansi256(8)`.\n-4. Contrast check: the adjacent NAME column in the same row renders `\\x1b[36m` (SGR 36, plain ANSI cyan) — confirms cell-level color styling reaches the output stream correctly in this environment, i.e. the DESCRIPTION column's distinct `38;5;8` sequence is not an artifact of color being globally suppressed, it is the specific hardcoded value under test.\n-5. Confirmed by direct `printf` comparison that `\\x1b[38;5;8m` (absolute palette color) and `\\x1b[2m` (SGR 2, \"faint/dim\", relative to the terminal's own current foreground) are different, non-equivalent escape sequences; only the latter adapts to a light vs. dark terminal foreground.\n+## Reproduction steps (minimized, reliably reproduces — confirmed 3/3 runs)\n \n-Local project workflows (`.fabro/workflows/*/workflow.toml`) all had empty `goal` fields, so the DESCRIPTION *cell text* itself was blank in this run — the escape sequence still wraps the (empty) cell content identically, which is sufficient to confirm the styling call site fires with the hardcoded color, but there was no local data to produce a directly human-legible \"dark grey text on dark background\" screenshot. `fabro ps` (the `runs/list.rs` command, which is reachable with populated cells including STATUS) requires a running Fabro server (`fabro server start` / `fabro install`) not available in this environment (`Failed to start fabro server ... no settings.toml configured`) — not exercised live; its code path is identical (`color_if(use_color, Color::Ansi256(8))` / same status-color match) and was verified statically instead in the prior stage.\n+This is reduced to the smallest sequence that still triggers the bug: no server, no `fabro install`/`fabro server start`, no populated `goal` fields, and no real pty are required. Removing any one of the two commands below, or dropping either env var, either loses the ability to observe color output at all (this sandbox has no real tty) or fails to build the binary. Both are load-bearing; nothing else is.\n+\n+**PRECONDITIONS AND DATA**\n+- Repo checked out at the current branch tip, working tree clean.\n+- Cwd = repo root (so `.fabro/workflows/*/workflow.toml` — 17 project workflow definitions already present in the repo — are discovered as \"Project Workflows\"). No fixture data needs to be created; the checked-in workflow files are sufficient, and none of them need a non-empty `goal` field for the bug to manifest (see step 3).\n+- No running Fabro server, no `settings.toml`, no account/credentials required — `fabro workflow list` never contacts a server.\n+- Environment variables `TERM=xterm-256color` and `CLICOLOR_FORCE=1` must be set on the command in step 2. Reason: this sandbox has no real tty, so two independent color-enable gates must be forced: `console::colors_enabled_stderr()` (gates the pre-styled title text, checks `CLICOLOR_FORCE` or a real tty) and `cli_table`'s `ColorChoice::Auto` (gates the table body, checks `termcolor::env_allows_color()` — requires `TERM` to be set and not `\"dumb\"`, and `NO_COLOR` unset). On a real terminal with a genuine dark-background tty, plain `fabro workflow list` reproduces without any env vars — the env vars are a sandbox-only substitute for \"has a tty with color support,\" not part of the bug's trigger condition itself.\n+\n+**ORDERED ACTIONS**\n+1. `cargo build -p fabro-cli` — produces `target/debug/fabro`. (One-time; not required on subsequent runs once the binary exists.)\n+2. `TERM=xterm-256color CLICOLOR_FORCE=1 ./target/debug/fabro workflow list 2>&1 | cat -v`\n+\n+That is the complete minimal sequence — a single command after the build. No further input, flags, or interaction is needed.\n+\n+**OBSERVED (WRONG) RESULT**\n+Every row under \"Project Workflows\" emits, for the DESCRIPTION cell:\n+```\n+^[[0m^[[0m ^[[0m^[[0m^[[0m^[[38;5;8m           ^[[0m ^[[0m\n+```\n+i.e. literal escape `\\x1b[38;5;8m` — SGR \"set foreground to 256-color palette index 8,\" an absolute dark-grey palette color, exactly `Color::Ansi256(8)` as reported. This color does not adapt to the terminal's actual background; on a dark-themed terminal it renders text that is nearly the same color as the background (per reporter) and is effectively unreadable.\n+\n+Contrast check confirms this isn't a global color-suppression artifact: the adjacent NAME cell in the identical row renders `^[[36m` (SGR 36, plain ANSI cyan) — a normal, terminal-relative color — proving color reaches the output stream correctly and the DESCRIPTION column's `38;5;8` is the specific defect, not an environment fluke.\n+\n+**EXPECTED RESULT**\n+The DESCRIPTION cell (and the other nine confirmed call sites — see Code locations) should use a terminal-relative \"dim/faint\" attribute (SGR 2, `\\x1b[2m`) instead of an absolute palette color, so it renders as a dimmed variant of whatever foreground the user's terminal theme actually uses — legible on both light and dark backgrounds. The repo already has this primitive in scope (`fabro_util::terminal::Styles::dim`, and `cli_table::CellStruct::dimmed(bool)` — see Evidence), it's just not applied at these ten sites.\n+\n+**RELIABILITY**\n+Reproduces deterministically, 3/3 consecutive runs, identical output each time (byte-identical DESCRIPTION-cell escape sequence). Not intermittent.\n+\n+Local project workflows (`.fabro/workflows/*/workflow.toml`) all have empty `goal` fields (confirmed via `grep -rn \"goal\" .fabro/workflows/*/workflow.toml` — zero matches across all 17 files), so the DESCRIPTION *cell text* itself is blank in this repro — the escape sequence still wraps the (empty) cell content identically, which is sufficient to confirm the styling call site fires with the hardcoded color, but there is no local data to produce a directly human-legible \"dark grey text on dark background\" screenshot with visible characters. `fabro ps` (the `runs/list.rs` command, which is reachable with populated cells including STATUS) requires a running Fabro server (`fabro server start` / `fabro install`) not available in this environment (`Failed to start fabro server ... no settings.toml configured`) — not exercised live; its code path is identical (`color_if(use_color, Color::Ansi256(8))` / same status-color match) and was verified statically instead.\n \n Unknown: reporter did not give the exact terminal emulator, exact background hex/theme name, or a captured transcript from their own machine — the steps above are an independently executed repro of the same underlying mechanism (hardcoded `Color::Ansi256(8)` reaching the output stream), not a replay of the reporter's own session.\n \n ## Evidence\n-Captured directly this stage (supersedes prior \"Unknown\"):\n-- Raw captured output at `/tmp/wf_list_raw.txt` (pty-captured via `script`) and inline command output (see Reproduction steps) showing `\\x1b[38;5;8m` emitted around the DESCRIPTION cell in `fabro workflow list` table rows, contrasted with `\\x1b[36m` on the adjacent NAME cell in the same row.\n+- Raw captured output at `/tmp/wf_list_raw.txt` (earlier pty capture via `script`) and `/tmp/repro_confirm.txt` (final confirmation run, this stage — 2 lines: the DESCRIPTION header row and the `card-game` row) showing `\\x1b[38;5;8m` emitted around the DESCRIPTION cell in `fabro workflow list` table rows, contrasted with `\\x1b[36m` on the adjacent NAME cell in the same row. Exit code of the confirmation run: `0` (command succeeds; the bug is a rendering defect, not a crash).\n - Confirmed via `cli-table` 0.5.0 crate source (`~/.cargo/registry/.../cli-table-0.5.0/src/style.rs`, `cell.rs`) that `CellStruct` (via the `Style` trait, already imported in all four affected files) exposes `fn dimmed(self, bool) -> Self`, which sets `termcolor::ColorSpec.dimmed`. Confirmed via `termcolor` 1.4.1 source (`src/lib.rs` ~line 1525, `Ansi::set_color`) that `spec.dimmed` emits literal `\\x1B[2m` (SGR 2, \"faint\") — a terminal-relative attribute, not an absolute palette color — with no ANSI-in-cell-width concern since it's set via the `Style` trait's structured `ColorSpec`, not by pre-styling the string before `.cell()`. This resolves the reporter's open technical question: `cli-table` 0.5's `CellStruct` *does* support a dim/faint attribute directly, so no string pre-styling + width-measurement workaround is needed.\n \n ## Reported hypothesis\n",
+        "summary": {
+          "files_changed": 1,
+          "additions": 119,
+          "deletions": 0
+        }
+      }
+    },
+    {
+      "seq": 0,
+      "checkpoint": {
+        "timestamp": "2026-08-06T23:38:03.072788398Z",
+        "current_node": "repro.report_result",
+        "completed_nodes": [
+          "start",
+          "understand_locate",
+          "repro.understand_report",
+          "repro.bring_up_app",
+          "repro.attempt_repro",
+          "repro.confirm_distill",
+          "repro.report_result"
+        ],
+        "node_retries": {},
+        "context_values": {
+          "graph.goal": "Fix a reported bug end-to-end and autonomously: reproduce it, diagnose the real root cause, fix it with adaptive escalation, verify against the logged repro steps, open a pull request, and drive CI to green",
+          "last_response": "No template file found locally — I'll build the report directly from the instructions' section list. Now writing `.facto/result.md`.The bug brief was already updated and committed in the prior `repr",
           "internal.run_id": "01KZCNWCW1GV00S1Q28JJN472Y",
           "internal.retry_count.understand_locate": 0,
           "response.repro.attempt_repro": "The `repro.bring_up_app` stage is already complete — it's committed as `6d0c237` and the working tree is clean with no uncommitted changes.\n\nChecking `.facto/bug-brief.md`, the reproduction was already performed and recorded in full:\n\n- Built `fabro-cli` and ran `TERM=xterm-256color CLICOLOR_FORCE=1 ./target/debug/fabro workflow list` under a pty\n- Observed the exact symptom: the DESCRIPTION cell emits literal `\\x1b[38;5;8m` (absolute 256-color palette index 8), contrasted against the adjacent NAME cell's `\\x1b[36m` — confirming the hardcoded `Color::Ansi256(8)` reaches the output stream exactly as the reporter described, and that this isn't a global color-suppression artifact\n- Resolved the reporter's open technical question by reading the `cli-table` 0.5.0 and `termcolor` 1.4.1 crate sources: `CellStruct` already exposes `.dimmed(bool)` (via the `Style` trait, already imported in all four affected files), which emits SGR 2 \"faint\" — a terminal-relative attribute — with no ANSI-in-column-width concern\n- Noted `fabro ps` (the `runs/list.rs` STATUS-color case) couldn't be driven live (needs a running server), so it was verified statically only\n\nThe brief's Root cause section is correctly left `Unknown` for the diagnosis stage, and all other established facts (preconditions, reproduction steps, evidence, code locations) are filled in. Nothing further is needed for this stage — it's already succeeded and persisted.",
           "response.repro.bring_up_app": "Now let's build the CLI and reproduce the bug with `fabro workflow list`.I'll wait for the background build to finish before driving the CLI.I'll just wait for the background build notification instead of polling.The `cargo build -p fabro-cli` command is running in the background; I'll wait for it to finish before driving the CLI.While the build compiles in the background, let me inspect the relevant source and the `cli-table` crate to resolve the reporter's open technical question.Excellent — `cli-table`'s `Style` trait exposes `.dimmed(bool)`, using `termcolor`'s `ColorSpec::set_dimmed`, which emits SGR 2 (faint) rather than an absolute color. This resolves the reporter's open question cleanly: no foreground color needed, no ANSI-in-column-width concern. Let me confirm `termcolor` actually emits SGR 2 for dimmed.Now let's check the `color_if` helper and `Styles::dim` definitions to plan the fix precisely.Good — `Style` trait is implemented for `CellStruct` and exposes `.dimmed(bool)`. Now let's check current imports in the affected files to know what needs adding.All four files already import `cli_table::Style`, so `.dimmed(bool)` is available with no new imports. Let me check the background build.Good, all the sites are clear now. Let's check on the build.Still compiling many dependencies from a fresh build. I'll wait for the background build task notification rather than continuing to poll manually.The `fabro-cli` build is compiling a large dependency tree; I'll wait for the background task notification rather than polling further.Build is still in progress. I'll stop polling and wait for the automatic notification when it finishes.The build finished successfully. Now let's reproduce the bug by running `fabro workflow list` and inspecting the raw ANSI output.`CLICOLOR_FORCE=1` will force color regardless of tty. Let's reproduce with that.`TERM=dumb` in this environment — that's why cli-table's `ColorChoice::Auto` suppressed the table body colors. Let's force `TERM` too.`fabro ps` is the hidden command that maps to `runs/list.rs`. Let's try it.I have solid reproduction evidence. Let me update the bug brief with these findings before finishing this stage.The bug brief is updated with the reproduction findings. Summary of what I confirmed:\n\n**Driver chosen:** CLI, run directly (this is a terminal color-rendering bug, no web/GUI involved). No project-specific \"run\" skill exists for launching the app, so I built `fabro-cli` (`cargo build -p fabro-cli`) and ran the resulting binary directly.\n\n**What I confirmed:**\n- Reproduced the exact mechanism: `fabro workflow list` emits literal `\\x1b[38;5;8m` (SGR \"set foreground to 256-color palette index 8\") around the DESCRIPTION cell — exactly `Color::Ansi256(8)` as reported — contrasted against the adjacent NAME cell's plain `\\x1b[36m` cyan, confirming color styling reaches output correctly and this specific escape is the bug, not a global suppression artifact.\n- Discovered and documented the two independent color-enablement gates in play (`console::colors_enabled_stderr()` for the pre-styled title text, and `cli_table`'s env-based — not tty-based — `ColorChoice::Auto`), which was needed to get color output at all in this sandboxed/no-real-tty environment.\n- Resolved the reporter's open technical question by reading the `cli-table` 0.5.0 and `termcolor` 1.4.1 crate sources: `CellStruct` already exposes `.dimmed(bool)` (all four affected files already import the `Style` trait), which emits SGR 2 (`\\x1b[2m`, terminal-relative \"faint\") via structured `ColorSpec` — no ANSI-in-cell-width concern, since nothing needs to be pre-styled into the string before `.cell()`.\n- `fabro ps` (the `runs/list.rs` command) requires a running server not available here, so it was verified statically only, not driven live.\n\nThis gives the fix stage a clear, low-risk path: replace each `.foreground_color(color_if(use_color, Color::Ansi256(8)))` with `.dimmed(use_color)`.",
           "outcome": "succeeded",
           "internal.retry_count.repro.bring_up_app": 0,
+          "internal.retry_count.repro.report_result": 0,
           "internal.node_visit_count": 1,
+          "response.repro.report_result": "No template file found locally — I'll build the report directly from the instructions' section list. Now writing `.facto/result.md`.The bug brief was already updated and committed in the prior `repro.confirm_distill` stage — it's fully current with the minimized repro, evidence, and reliability notes, so no further edits are needed there. `.facto/result.md` is now written with the reproduction report.\n\n## Reproduction report\n\n**Bug:** `fabro` CLI tables hardcode secondary/status text to `Color::Ansi256(8)`, an absolute dark-grey palette color, instead of a terminal-relative dim attribute — nearly invisible on dark-background terminals. 10 confirmed sites across `runs/list.rs`, `model.rs`, `workflow/list.rs`, `run/checkpoints.rs`.\n\n**Reproduced?** Yes, 3/3 deterministic runs.\n1. `cargo build -p fabro-cli`\n2. `TERM=xterm-256color CLICOLOR_FORCE=1 ./target/debug/fabro workflow list 2>&1 | cat -v`\n\nObserved literal `\\x1b[38;5;8m` around the DESCRIPTION cell (vs. plain `\\x1b[36m` on the adjacent NAME cell, proving color output works and this specific site is the defect). Also resolved the reporter's open question: `cli_table::CellStruct::dimmed(bool)` exists and emits proper SGR 2 faint, so the fix path is clear — swap `.foreground_color(color_if(use_color, Color::Ansi256(8)))` for `.dimmed(use_color)` at all ten sites.",
           "failure_class": "",
           "internal.thread_id": "fix-bug.repro",
           "internal.fidelity": "summary:high",
@@ -11689,8 +11850,8 @@
           "response.repro.confirm_distill": "I'll read the current bug brief to see what's already documented before refining it into a minimal repeatable repro sequence.Reproduced reliably a third time. Now I'll update the bug brief with the minimized, precisely-formatted repro sequence and confirmation evidence.Both goals are met: the bug reliably reproduces (confirmed 3/3 identical runs) and the minimal repeatable sequence is logged in `.facto/bug-brief.md` — one build command plus a single `fabro workflow list` invocation, with explicit preconditions, ordered actions, observed-vs-expected output, and captured evidence (`/tmp/wf_list_raw.txt`, `/tmp/repro_confirm.txt`).The change to `.facto/bug-brief.md` is staged. Consistent with the pattern in the git log (each stage's commit is created automatically by the pipeline, named after the stage), I've left it staged rather than committing manually — the pipeline will commit as `repro.attempt_repro (succeeded)`.",
           "internal.retry_count.start": 0,
           "thread.start.current_node": "understand_locate",
-          "current_node": "repro.confirm_distill",
-          "last_stage": "repro.confirm_distill",
+          "current_node": "repro.report_result",
+          "last_stage": "repro.report_result",
           "graph.thread_id": "fix-bug",
           "graph.rankdir": "LR",
           "failure_signature": "",
@@ -11698,9 +11859,67 @@
           "internal.retry_count.repro.attempt_repro": 0,
           "response.understand_locate": "Now writing the brief from the report content only, without touching the rest of the codebase.`.facto/bug-brief.md` is written. Summary:\n\n**Filled in:** Report source, Expected behavior, Actual behavior, Affected area, Reported hypothesis (verbatim reporter claims, including the claimed file/line table, the `cli-table` open question, and the \"no existing test\" note).\n\n**Left `Unknown`:** Code locations (verifying them is a later stage's job, per instructions — the reporter's claimed table is preserved under Reported hypothesis instead), Preconditions/environment (partially filled, but exact terminal/theme unspecified), Reproduction steps (inferred general steps only, no exact captured transcript in the report), Evidence (none was provided — no screenshots/logs/output), Root cause (diagnosis stage's job).\n\n**Fix constraints:** recorded the reporter's open technical question plus the standing workflow constraints (fix root cause, don't weaken functionality, add a regression test).\n\n**Optional status write:** skipped with a warning — `facto-helper.sh` is not present anywhere on this machine, and the report is free text with no associated issue number, so there's no tracker item to update.",
           "internal.retry_count.repro.understand_report": 0,
-          "thread.fix-bug.repro.current_node": "repro.confirm_distill"
+          "thread.fix-bug.repro.current_node": "repro.report_result"
         },
         "node_outcomes": {
+          "repro.confirm_distill": {
+            "status": "succeeded",
+            "context_updates": {
+              "response.repro.confirm_distill": "I'll read the current bug brief to see what's already documented before refining it into a minimal repeatable repro sequence.Reproduced reliably a third time. Now I'll update the bug brief with the minimized, precisely-formatted repro sequence and confirmation evidence.Both goals are met: the bug reliably reproduces (confirmed 3/3 identical runs) and the minimal repeatable sequence is logged in `.facto/bug-brief.md` — one build command plus a single `fabro workflow list` invocation, with explicit preconditions, ordered actions, observed-vs-expected output, and captured evidence (`/tmp/wf_list_raw.txt`, `/tmp/repro_confirm.txt`).The change to `.facto/bug-brief.md` is staged. Consistent with the pattern in the git log (each stage's commit is created automatically by the pipeline, named after the stage), I've left it staged rather than committing manually — the pipeline will commit as `repro.attempt_repro (succeeded)`.",
+              "last_response": "I'll read the current bug brief to see what's already documented before refining it into a minimal repeatable repro sequence.Reproduced reliably a third time. Now I'll update the bug brief with the mi",
+              "last_stage": "repro.confirm_distill"
+            },
+            "notes": "Stage completed: repro.confirm_distill",
+            "usage": null,
+            "timing": {
+              "wall_time_ms": 0,
+              "inference_time_ms": 87974,
+              "tool_time_ms": 0,
+              "active_time_ms": 87974
+            }
+          },
+          "repro.report_result": {
+            "status": "succeeded",
+            "context_updates": {
+              "last_stage": "repro.report_result",
+              "last_response": "No template file found locally — I'll build the report directly from the instructions' section list. Now writing `.facto/result.md`.The bug brief was already updated and committed in the prior `repr",
+              "response.repro.report_result": "No template file found locally — I'll build the report directly from the instructions' section list. Now writing `.facto/result.md`.The bug brief was already updated and committed in the prior `repro.confirm_distill` stage — it's fully current with the minimized repro, evidence, and reliability notes, so no further edits are needed there. `.facto/result.md` is now written with the reproduction report.\n\n## Reproduction report\n\n**Bug:** `fabro` CLI tables hardcode secondary/status text to `Color::Ansi256(8)`, an absolute dark-grey palette color, instead of a terminal-relative dim attribute — nearly invisible on dark-background terminals. 10 confirmed sites across `runs/list.rs`, `model.rs`, `workflow/list.rs`, `run/checkpoints.rs`.\n\n**Reproduced?** Yes, 3/3 deterministic runs.\n1. `cargo build -p fabro-cli`\n2. `TERM=xterm-256color CLICOLOR_FORCE=1 ./target/debug/fabro workflow list 2>&1 | cat -v`\n\nObserved literal `\\x1b[38;5;8m` around the DESCRIPTION cell (vs. plain `\\x1b[36m` on the adjacent NAME cell, proving color output works and this specific site is the defect). Also resolved the reporter's open question: `cli_table::CellStruct::dimmed(bool)` exists and emits proper SGR 2 faint, so the fix path is clear — swap `.foreground_color(color_if(use_color, Color::Ansi256(8)))` for `.dimmed(use_color)` at all ten sites."
+            },
+            "notes": "Stage completed: repro.report_result",
+            "usage": null,
+            "files_touched": [
+              ".facto/result.md"
+            ],
+            "timing": {
+              "wall_time_ms": 0,
+              "inference_time_ms": 53364,
+              "tool_time_ms": 0,
+              "active_time_ms": 53364
+            }
+          },
+          "repro.bring_up_app": {
+            "status": "succeeded",
+            "context_updates": {
+              "last_response": "Now let's build the CLI and reproduce the bug with `fabro workflow list`.I'll wait for the background build to finish before driving the CLI.I'll just wait for the background build notification instea",
+              "last_stage": "repro.bring_up_app",
+              "response.repro.bring_up_app": "Now let's build the CLI and reproduce the bug with `fabro workflow list`.I'll wait for the background build to finish before driving the CLI.I'll just wait for the background build notification instead of polling.The `cargo build -p fabro-cli` command is running in the background; I'll wait for it to finish before driving the CLI.While the build compiles in the background, let me inspect the relevant source and the `cli-table` crate to resolve the reporter's open technical question.Excellent — `cli-table`'s `Style` trait exposes `.dimmed(bool)`, using `termcolor`'s `ColorSpec::set_dimmed`, which emits SGR 2 (faint) rather than an absolute color. This resolves the reporter's open question cleanly: no foreground color needed, no ANSI-in-column-width concern. Let me confirm `termcolor` actually emits SGR 2 for dimmed.Now let's check the `color_if` helper and `Styles::dim` definitions to plan the fix precisely.Good — `Style` trait is implemented for `CellStruct` and exposes `.dimmed(bool)`. Now let's check current imports in the affected files to know what needs adding.All four files already import `cli_table::Style`, so `.dimmed(bool)` is available with no new imports. Let me check the background build.Good, all the sites are clear now. Let's check on the build.Still compiling many dependencies from a fresh build. I'll wait for the background build task notification rather than continuing to poll manually.The `fabro-cli` build is compiling a large dependency tree; I'll wait for the background task notification rather than polling further.Build is still in progress. I'll stop polling and wait for the automatic notification when it finishes.The build finished successfully. Now let's reproduce the bug by running `fabro workflow list` and inspecting the raw ANSI output.`CLICOLOR_FORCE=1` will force color regardless of tty. Let's reproduce with that.`TERM=dumb` in this environment — that's why cli-table's `ColorChoice::Auto` suppressed the table body colors. Let's force `TERM` too.`fabro ps` is the hidden command that maps to `runs/list.rs`. Let's try it.I have solid reproduction evidence. Let me update the bug brief with these findings before finishing this stage.The bug brief is updated with the reproduction findings. Summary of what I confirmed:\n\n**Driver chosen:** CLI, run directly (this is a terminal color-rendering bug, no web/GUI involved). No project-specific \"run\" skill exists for launching the app, so I built `fabro-cli` (`cargo build -p fabro-cli`) and ran the resulting binary directly.\n\n**What I confirmed:**\n- Reproduced the exact mechanism: `fabro workflow list` emits literal `\\x1b[38;5;8m` (SGR \"set foreground to 256-color palette index 8\") around the DESCRIPTION cell — exactly `Color::Ansi256(8)` as reported — contrasted against the adjacent NAME cell's plain `\\x1b[36m` cyan, confirming color styling reaches output correctly and this specific escape is the bug, not a global suppression artifact.\n- Discovered and documented the two independent color-enablement gates in play (`console::colors_enabled_stderr()` for the pre-styled title text, and `cli_table`'s env-based — not tty-based — `ColorChoice::Auto`), which was needed to get color output at all in this sandboxed/no-real-tty environment.\n- Resolved the reporter's open technical question by reading the `cli-table` 0.5.0 and `termcolor` 1.4.1 crate sources: `CellStruct` already exposes `.dimmed(bool)` (all four affected files already import the `Style` trait), which emits SGR 2 (`\\x1b[2m`, terminal-relative \"faint\") via structured `ColorSpec` — no ANSI-in-cell-width concern, since nothing needs to be pre-styled into the string before `.cell()`.\n- `fabro ps` (the `runs/list.rs` command) requires a running server not available here, so it was verified statically only, not driven live.\n\nThis gives the fix stage a clear, low-risk path: replace each `.foreground_color(color_if(use_color, Color::Ansi256(8)))` with `.dimmed(use_color)`."
+            },
+            "notes": "Stage completed: repro.bring_up_app",
+            "usage": null,
+            "files_touched": [
+              ".facto/bug-brief.md"
+            ],
+            "timing": {
+              "wall_time_ms": 0,
+              "inference_time_ms": 871798,
+              "tool_time_ms": 0,
+              "active_time_ms": 871798
+            }
+          },
+          "start": {
+            "status": "succeeded",
+            "usage": null
+          },
           "repro.understand_report": {
             "status": "succeeded",
             "context_updates": {
@@ -11739,22 +11958,6 @@
               "active_time_ms": 52387
             }
           },
-          "repro.confirm_distill": {
-            "status": "succeeded",
-            "context_updates": {
-              "response.repro.confirm_distill": "I'll read the current bug brief to see what's already documented before refining it into a minimal repeatable repro sequence.Reproduced reliably a third time. Now I'll update the bug brief with the minimized, precisely-formatted repro sequence and confirmation evidence.Both goals are met: the bug reliably reproduces (confirmed 3/3 identical runs) and the minimal repeatable sequence is logged in `.facto/bug-brief.md` — one build command plus a single `fabro workflow list` invocation, with explicit preconditions, ordered actions, observed-vs-expected output, and captured evidence (`/tmp/wf_list_raw.txt`, `/tmp/repro_confirm.txt`).The change to `.facto/bug-brief.md` is staged. Consistent with the pattern in the git log (each stage's commit is created automatically by the pipeline, named after the stage), I've left it staged rather than committing manually — the pipeline will commit as `repro.attempt_repro (succeeded)`.",
-              "last_response": "I'll read the current bug brief to see what's already documented before refining it into a minimal repeatable repro sequence.Reproduced reliably a third time. Now I'll update the bug brief with the mi",
-              "last_stage": "repro.confirm_distill"
-            },
-            "notes": "Stage completed: repro.confirm_distill",
-            "usage": null,
-            "timing": {
-              "wall_time_ms": 0,
-              "inference_time_ms": 87974,
-              "tool_time_ms": 0,
-              "active_time_ms": 87974
-            }
-          },
           "repro.attempt_repro": {
             "status": "succeeded",
             "context_updates": {
@@ -11770,33 +11973,11 @@
               "tool_time_ms": 0,
               "active_time_ms": 29194
             }
-          },
-          "repro.bring_up_app": {
-            "status": "succeeded",
-            "context_updates": {
-              "last_response": "Now let's build the CLI and reproduce the bug with `fabro workflow list`.I'll wait for the background build to finish before driving the CLI.I'll just wait for the background build notification instea",
-              "last_stage": "repro.bring_up_app",
-              "response.repro.bring_up_app": "Now let's build the CLI and reproduce the bug with `fabro workflow list`.I'll wait for the background build to finish before driving the CLI.I'll just wait for the background build notification instead of polling.The `cargo build -p fabro-cli` command is running in the background; I'll wait for it to finish before driving the CLI.While the build compiles in the background, let me inspect the relevant source and the `cli-table` crate to resolve the reporter's open technical question.Excellent — `cli-table`'s `Style` trait exposes `.dimmed(bool)`, using `termcolor`'s `ColorSpec::set_dimmed`, which emits SGR 2 (faint) rather than an absolute color. This resolves the reporter's open question cleanly: no foreground color needed, no ANSI-in-column-width concern. Let me confirm `termcolor` actually emits SGR 2 for dimmed.Now let's check the `color_if` helper and `Styles::dim` definitions to plan the fix precisely.Good — `Style` trait is implemented for `CellStruct` and exposes `.dimmed(bool)`. Now let's check current imports in the affected files to know what needs adding.All four files already import `cli_table::Style`, so `.dimmed(bool)` is available with no new imports. Let me check the background build.Good, all the sites are clear now. Let's check on the build.Still compiling many dependencies from a fresh build. I'll wait for the background build task notification rather than continuing to poll manually.The `fabro-cli` build is compiling a large dependency tree; I'll wait for the background task notification rather than polling further.Build is still in progress. I'll stop polling and wait for the automatic notification when it finishes.The build finished successfully. Now let's reproduce the bug by running `fabro workflow list` and inspecting the raw ANSI output.`CLICOLOR_FORCE=1` will force color regardless of tty. Let's reproduce with that.`TERM=dumb` in this environment — that's why cli-table's `ColorChoice::Auto` suppressed the table body colors. Let's force `TERM` too.`fabro ps` is the hidden command that maps to `runs/list.rs`. Let's try it.I have solid reproduction evidence. Let me update the bug brief with these findings before finishing this stage.The bug brief is updated with the reproduction findings. Summary of what I confirmed:\n\n**Driver chosen:** CLI, run directly (this is a terminal color-rendering bug, no web/GUI involved). No project-specific \"run\" skill exists for launching the app, so I built `fabro-cli` (`cargo build -p fabro-cli`) and ran the resulting binary directly.\n\n**What I confirmed:**\n- Reproduced the exact mechanism: `fabro workflow list` emits literal `\\x1b[38;5;8m` (SGR \"set foreground to 256-color palette index 8\") around the DESCRIPTION cell — exactly `Color::Ansi256(8)` as reported — contrasted against the adjacent NAME cell's plain `\\x1b[36m` cyan, confirming color styling reaches output correctly and this specific escape is the bug, not a global suppression artifact.\n- Discovered and documented the two independent color-enablement gates in play (`console::colors_enabled_stderr()` for the pre-styled title text, and `cli_table`'s env-based — not tty-based — `ColorChoice::Auto`), which was needed to get color output at all in this sandboxed/no-real-tty environment.\n- Resolved the reporter's open technical question by reading the `cli-table` 0.5.0 and `termcolor` 1.4.1 crate sources: `CellStruct` already exposes `.dimmed(bool)` (all four affected files already import the `Style` trait), which emits SGR 2 (`\\x1b[2m`, terminal-relative \"faint\") via structured `ColorSpec` — no ANSI-in-cell-width concern, since nothing needs to be pre-styled into the string before `.cell()`.\n- `fabro ps` (the `runs/list.rs` command) requires a running server not available here, so it was verified statically only, not driven live.\n\nThis gives the fix stage a clear, low-risk path: replace each `.foreground_color(color_if(use_color, Color::Ansi256(8)))` with `.dimmed(use_color)`."
-            },
-            "notes": "Stage completed: repro.bring_up_app",
-            "usage": null,
-            "files_touched": [
-              ".facto/bug-brief.md"
-            ],
-            "timing": {
-              "wall_time_ms": 0,
-              "inference_time_ms": 871798,
-              "tool_time_ms": 0,
-              "active_time_ms": 871798
-            }
-          },
-          "start": {
-            "status": "succeeded",
-            "usage": null
           }
         },
-        "next_node_id": "repro.report_result",
+        "next_node_id": "check_repro",
         "node_visits": {
+          "repro.report_result": 1,
           "repro.bring_up_app": 1,
           "repro.confirm_distill": 1,
           "understand_locate": 1,
@@ -11929,7 +12110,12 @@
       "first_event_seq": 78,
       "prompt": null,
       "response": null,
-      "completion": null,
+      "completion": {
+        "outcome": "succeeded",
+        "notes": "Stage completed: repro.confirm_distill",
+        "failure_reason": null,
+        "timestamp": "2026-08-06T23:37:05.917323797Z"
+      },
       "provider_used": {
         "mode": "acp",
         "provider": "acp"
@@ -11948,7 +12134,47 @@
       "started_at": "2026-08-06T23:35:37.733918431Z",
       "handler": "agent",
       "graph_visit": 1,
-      "live_inference_ms": 87974,
+      "timing": {
+        "wall_time_ms": 88180,
+        "inference_time_ms": 87974,
+        "tool_time_ms": 0,
+        "active_time_ms": 87974
+      },
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_tokens": 0,
+        "reasoning_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      "agent_control": "running",
+      "state": "succeeded"
+    },
+    "repro.report_result@1": {
+      "first_event_seq": 92,
+      "prompt": null,
+      "response": null,
+      "completion": null,
+      "provider_used": {
+        "mode": "acp",
+        "provider": "acp"
+      },
+      "diff": null,
+      "script_invocation": null,
+      "script_timing": {
+        "stdout": "No template file found locally — I'll build the report directly from the instructions' section list. Now writing `.facto/result.md`.The bug brief was already updated and committed in the prior `repro.confirm_distill` stage — it's fully current with the minimized repro, evidence, and reliability notes, so no further edits are needed there. `.facto/result.md` is now written with the reproduction report.\n\n## Reproduction report\n\n**Bug:** `fabro` CLI tables hardcode secondary/status text to `Color::Ansi256(8)`, an absolute dark-grey palette color, instead of a terminal-relative dim attribute — nearly invisible on dark-background terminals. 10 confirmed sites across `runs/list.rs`, `model.rs`, `workflow/list.rs`, `run/checkpoints.rs`.\n\n**Reproduced?** Yes, 3/3 deterministic runs.\n1. `cargo build -p fabro-cli`\n2. `TERM=xterm-256color CLICOLOR_FORCE=1 ./target/debug/fabro workflow list 2>&1 | cat -v`\n\nObserved literal `\\x1b[38;5;8m` around the DESCRIPTION cell (vs. plain `\\x1b[36m` on the adjacent NAME cell, proving color output works and this specific site is the defect). Also resolved the reporter's open question: `cli_table::CellStruct::dimmed(bool)` exists and emits proper SGR 2 faint, so the fix path is clear — swap `.foreground_color(color_if(use_color, Color::Ansi256(8)))` for `.dimmed(use_color)` at all ten sites.",
+        "stderr": "",
+        "stop_reason": "end_turn",
+        "duration_ms": 53364
+      },
+      "parallel_results": null,
+      "output": null,
+      "termination": "exited",
+      "started_at": "2026-08-06T23:37:09.377936051Z",
+      "handler": "agent",
+      "graph_visit": 1,
+      "live_inference_ms": 53364,
       "usage": {
         "input_tokens": 0,
         "output_tokens": 0,

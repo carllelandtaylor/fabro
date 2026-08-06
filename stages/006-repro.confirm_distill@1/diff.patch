@@ -1,0 +1,58 @@
+diff --git a/.facto/bug-brief.md b/.facto/bug-brief.md
+index d9b410b..e9b5b70 100644
+--- a/.facto/bug-brief.md
++++ b/.facto/bug-brief.md
+@@ -35,21 +35,43 @@ Still open (the reporter's stated open question, unresolved by this stage — no
+ - Color output enabled. Confirmed by driving the actual built binary: `Styles::detect_stderr()` (used by `workflow list.rs`) calls `console::colors_enabled_stderr()`, which is gated on `env::var("CLICOLOR_FORCE")` (or a real stderr tty) — plain piping/no-tty disables it. Separately and *in addition*, `cli_table`'s own `ColorChoice::Auto` (set from the same `use_color` bool at each call site) is gated on `termcolor`'s `env_allows_color()`, which checks `TERM` (must not be unset/`"dumb"`) and `NO_COLOR` (must be unset) — this check is not tty-based at all, it's pure env var. Both gates must pass for table-body ANSI color to actually appear in the output stream. Reproduced by running the built CLI with `TERM=xterm-256color CLICOLOR_FORCE=1` under a `script`-allocated pty.
+ - Reporter did not specify a particular OS, shell, or terminal emulator — general "dark terminal theme" is the stated condition. Not needed for repro: the emitted SGR sequence is visible/verifiable directly in captured output without an actual dark-background display.
+ 
+-## Reproduction steps
+-Executed directly (CLI driver, no UI needed) against the current branch build:
+-1. `cargo build -p fabro-cli` (binary at `target/debug/fabro`).
+-2. `TERM=xterm-256color CLICOLOR_FORCE=1 ./target/debug/fabro workflow list 2>&1 | cat -v` (pty allocated via `script -qec ... /tmp/wf_list_raw.txt` gives an identical result; a real pty is not even required here since `cli_table`'s Auto gate is env-based, not tty-based, per above).
+-3. Observed output for the DESCRIPTION column of every project-workflow row: `^[[0m^[[0m ^[[0m^[[0m^[[0m^[[38;5;8m           ^[[0m ^[[0m` — i.e. literal escape `\x1b[38;5;8m` (SGR "set foreground to 256-color palette index 8") wraps the cell content exactly as the reporter claimed for `Color::Ansi256(8)`.
+-4. Contrast check: the adjacent NAME column in the same row renders `\x1b[36m` (SGR 36, plain ANSI cyan) — confirms cell-level color styling reaches the output stream correctly in this environment, i.e. the DESCRIPTION column's distinct `38;5;8` sequence is not an artifact of color being globally suppressed, it is the specific hardcoded value under test.
+-5. Confirmed by direct `printf` comparison that `\x1b[38;5;8m` (absolute palette color) and `\x1b[2m` (SGR 2, "faint/dim", relative to the terminal's own current foreground) are different, non-equivalent escape sequences; only the latter adapts to a light vs. dark terminal foreground.
++## Reproduction steps (minimized, reliably reproduces — confirmed 3/3 runs)
+ 
+-Local project workflows (`.fabro/workflows/*/workflow.toml`) all had empty `goal` fields, so the DESCRIPTION *cell text* itself was blank in this run — the escape sequence still wraps the (empty) cell content identically, which is sufficient to confirm the styling call site fires with the hardcoded color, but there was no local data to produce a directly human-legible "dark grey text on dark background" screenshot. `fabro ps` (the `runs/list.rs` command, which is reachable with populated cells including STATUS) requires a running Fabro server (`fabro server start` / `fabro install`) not available in this environment (`Failed to start fabro server ... no settings.toml configured`) — not exercised live; its code path is identical (`color_if(use_color, Color::Ansi256(8))` / same status-color match) and was verified statically instead in the prior stage.
++This is reduced to the smallest sequence that still triggers the bug: no server, no `fabro install`/`fabro server start`, no populated `goal` fields, and no real pty are required. Removing any one of the two commands below, or dropping either env var, either loses the ability to observe color output at all (this sandbox has no real tty) or fails to build the binary. Both are load-bearing; nothing else is.
++
++**PRECONDITIONS AND DATA**
++- Repo checked out at the current branch tip, working tree clean.
++- Cwd = repo root (so `.fabro/workflows/*/workflow.toml` — 17 project workflow definitions already present in the repo — are discovered as "Project Workflows"). No fixture data needs to be created; the checked-in workflow files are sufficient, and none of them need a non-empty `goal` field for the bug to manifest (see step 3).
++- No running Fabro server, no `settings.toml`, no account/credentials required — `fabro workflow list` never contacts a server.
++- Environment variables `TERM=xterm-256color` and `CLICOLOR_FORCE=1` must be set on the command in step 2. Reason: this sandbox has no real tty, so two independent color-enable gates must be forced: `console::colors_enabled_stderr()` (gates the pre-styled title text, checks `CLICOLOR_FORCE` or a real tty) and `cli_table`'s `ColorChoice::Auto` (gates the table body, checks `termcolor::env_allows_color()` — requires `TERM` to be set and not `"dumb"`, and `NO_COLOR` unset). On a real terminal with a genuine dark-background tty, plain `fabro workflow list` reproduces without any env vars — the env vars are a sandbox-only substitute for "has a tty with color support," not part of the bug's trigger condition itself.
++
++**ORDERED ACTIONS**
++1. `cargo build -p fabro-cli` — produces `target/debug/fabro`. (One-time; not required on subsequent runs once the binary exists.)
++2. `TERM=xterm-256color CLICOLOR_FORCE=1 ./target/debug/fabro workflow list 2>&1 | cat -v`
++
++That is the complete minimal sequence — a single command after the build. No further input, flags, or interaction is needed.
++
++**OBSERVED (WRONG) RESULT**
++Every row under "Project Workflows" emits, for the DESCRIPTION cell:
++```
++^[[0m^[[0m ^[[0m^[[0m^[[0m^[[38;5;8m           ^[[0m ^[[0m
++```
++i.e. literal escape `\x1b[38;5;8m` — SGR "set foreground to 256-color palette index 8," an absolute dark-grey palette color, exactly `Color::Ansi256(8)` as reported. This color does not adapt to the terminal's actual background; on a dark-themed terminal it renders text that is nearly the same color as the background (per reporter) and is effectively unreadable.
++
++Contrast check confirms this isn't a global color-suppression artifact: the adjacent NAME cell in the identical row renders `^[[36m` (SGR 36, plain ANSI cyan) — a normal, terminal-relative color — proving color reaches the output stream correctly and the DESCRIPTION column's `38;5;8` is the specific defect, not an environment fluke.
++
++**EXPECTED RESULT**
++The DESCRIPTION cell (and the other nine confirmed call sites — see Code locations) should use a terminal-relative "dim/faint" attribute (SGR 2, `\x1b[2m`) instead of an absolute palette color, so it renders as a dimmed variant of whatever foreground the user's terminal theme actually uses — legible on both light and dark backgrounds. The repo already has this primitive in scope (`fabro_util::terminal::Styles::dim`, and `cli_table::CellStruct::dimmed(bool)` — see Evidence), it's just not applied at these ten sites.
++
++**RELIABILITY**
++Reproduces deterministically, 3/3 consecutive runs, identical output each time (byte-identical DESCRIPTION-cell escape sequence). Not intermittent.
++
++Local project workflows (`.fabro/workflows/*/workflow.toml`) all have empty `goal` fields (confirmed via `grep -rn "goal" .fabro/workflows/*/workflow.toml` — zero matches across all 17 files), so the DESCRIPTION *cell text* itself is blank in this repro — the escape sequence still wraps the (empty) cell content identically, which is sufficient to confirm the styling call site fires with the hardcoded color, but there is no local data to produce a directly human-legible "dark grey text on dark background" screenshot with visible characters. `fabro ps` (the `runs/list.rs` command, which is reachable with populated cells including STATUS) requires a running Fabro server (`fabro server start` / `fabro install`) not available in this environment (`Failed to start fabro server ... no settings.toml configured`) — not exercised live; its code path is identical (`color_if(use_color, Color::Ansi256(8))` / same status-color match) and was verified statically instead.
+ 
+ Unknown: reporter did not give the exact terminal emulator, exact background hex/theme name, or a captured transcript from their own machine — the steps above are an independently executed repro of the same underlying mechanism (hardcoded `Color::Ansi256(8)` reaching the output stream), not a replay of the reporter's own session.
+ 
+ ## Evidence
+-Captured directly this stage (supersedes prior "Unknown"):
+-- Raw captured output at `/tmp/wf_list_raw.txt` (pty-captured via `script`) and inline command output (see Reproduction steps) showing `\x1b[38;5;8m` emitted around the DESCRIPTION cell in `fabro workflow list` table rows, contrasted with `\x1b[36m` on the adjacent NAME cell in the same row.
++- Raw captured output at `/tmp/wf_list_raw.txt` (earlier pty capture via `script`) and `/tmp/repro_confirm.txt` (final confirmation run, this stage — 2 lines: the DESCRIPTION header row and the `card-game` row) showing `\x1b[38;5;8m` emitted around the DESCRIPTION cell in `fabro workflow list` table rows, contrasted with `\x1b[36m` on the adjacent NAME cell in the same row. Exit code of the confirmation run: `0` (command succeeds; the bug is a rendering defect, not a crash).
+ - Confirmed via `cli-table` 0.5.0 crate source (`~/.cargo/registry/.../cli-table-0.5.0/src/style.rs`, `cell.rs`) that `CellStruct` (via the `Style` trait, already imported in all four affected files) exposes `fn dimmed(self, bool) -> Self`, which sets `termcolor::ColorSpec.dimmed`. Confirmed via `termcolor` 1.4.1 source (`src/lib.rs` ~line 1525, `Ansi::set_color`) that `spec.dimmed` emits literal `\x1B[2m` (SGR 2, "faint") — a terminal-relative attribute, not an absolute palette color — with no ANSI-in-cell-width concern since it's set via the `Style` trait's structured `ColorSpec`, not by pre-styling the string before `.cell()`. This resolves the reporter's open technical question: `cli-table` 0.5's `CellStruct` *does* support a dim/faint attribute directly, so no string pre-styling + width-measurement workaround is needed.
+ 
+ ## Reported hypothesis

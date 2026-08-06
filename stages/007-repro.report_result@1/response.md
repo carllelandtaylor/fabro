@@ -1,0 +1,11 @@
+No template file found locally — I'll build the report directly from the instructions' section list. Now writing `.facto/result.md`.The bug brief was already updated and committed in the prior `repro.confirm_distill` stage — it's fully current with the minimized repro, evidence, and reliability notes, so no further edits are needed there. `.facto/result.md` is now written with the reproduction report.
+
+## Reproduction report
+
+**Bug:** `fabro` CLI tables hardcode secondary/status text to `Color::Ansi256(8)`, an absolute dark-grey palette color, instead of a terminal-relative dim attribute — nearly invisible on dark-background terminals. 10 confirmed sites across `runs/list.rs`, `model.rs`, `workflow/list.rs`, `run/checkpoints.rs`.
+
+**Reproduced?** Yes, 3/3 deterministic runs.
+1. `cargo build -p fabro-cli`
+2. `TERM=xterm-256color CLICOLOR_FORCE=1 ./target/debug/fabro workflow list 2>&1 | cat -v`
+
+Observed literal `\x1b[38;5;8m` around the DESCRIPTION cell (vs. plain `\x1b[36m` on the adjacent NAME cell, proving color output works and this specific site is the defect). Also resolved the reporter's open question: `cli_table::CellStruct::dimmed(bool)` exists and emits proper SGR 2 faint, so the fix path is clear — swap `.foreground_color(color_if(use_color, Color::Ansi256(8)))` for `.dimmed(use_color)` at all ten sites.
