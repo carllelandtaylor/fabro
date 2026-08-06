@@ -1,0 +1,5 @@
+{
+  "script": "set -e; TASK_DIR=\"$(facto-helper.sh task-dir)\"; mkdir -p \"$TASK_DIR\"; echo \"$TASK_DIR/implementation-plan.md\"",
+  "command": "exec 2>&1\nset -e; TASK_DIR=\"$(facto-helper.sh task-dir)\"; mkdir -p \"$TASK_DIR\"; echo \"$TASK_DIR/implementation-plan.md\"",
+  "language": "shell"
+}
