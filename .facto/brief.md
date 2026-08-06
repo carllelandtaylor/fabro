@@ -1,0 +1,75 @@
+# Fix planning brief
+
+This brief is the sole input to the planning stage. Plan a FIX for the root cause below — not a feature, not a refactor beyond what the fix requires.
+
+## 1. Root cause
+
+**One-line statement:** Ten call sites across four `fabro-cli` command files style secondary/status table cells with `.foreground_color(color_if(use_color, Color::Ansi256(8)))` — an absolute, non-adaptive 256-color palette index — instead of `cli_table::CellStruct::dimmed(bool)`, the terminal-relative dim/faint (SGR 2) mechanism the crate already provides for exactly this purpose; on dark-background terminals `Ansi256(8)` renders as near-invisible text.
+
+**Supporting trace:**
+- `cli_table` 0.5.0's `CellStruct` (via the `Style` trait, already imported in all four affected files) exposes `fn dimmed(self, bool) -> Self`, confirmed at `~/.cargo/registry/.../cli-table-0.5.0/src/style.rs:18,79-82`. It sets `ColorSpec::set_dimmed`, which `termcolor` 1.4.1's `Ansi::set_color` (confirmed `src/lib.rs` ~line 1525) turns into literal `\x1b[2m` (SGR 2, "faint" — relative to the terminal's own foreground), not an absolute palette color.
+- The project already has an equivalent terminal-relative primitive in scope in three of the four files: `fabro_util::terminal::Styles::dim` at `lib/foundation/fabro-util/src/terminal.rs:28` (`Style::new().dim().force_styling(use_color)`). `workflow/list.rs::print_section` already calls `styles.dim.apply_to(...)` two lines above the buggy table cell in the same function — the correct primitive is already in scope there, just not applied to the cell.
+- Reproduction confirmed color reaches the output stream correctly (the adjacent NAME cell renders plain `\x1b[36m` cyan in the same row), isolating the defect specifically to the `Ansi256(8)` call sites, not a global color-suppression issue.
+
+**Files and functions involved (all ten confirmed occurrences — verified via `rg -n "Ansi256\(8\)" lib/apps/fabro-cli/src`, exactly these ten hits, no more):**
+- `lib/apps/fabro-cli/src/commands/runs/list.rs`
+  - `fn list_command` (lines 18–169), row-building closure: line 128 (RUN ID cell), line 138 (PARENT cell), line 148 (GOAL cell) — each `.foreground_color(color_if(use_color, Color::Ansi256(8)))`.
+  - `fn status_cell` (lines 171–186): line 178 — `Color::Ansi256(8)` used as the STATUS color for `RunStatus::Submitted | Pending | Dead`; line 184 — `.bold(use_color && color != Some(Color::Ansi256(8)))` uses `Ansi256(8)` as a sentinel to suppress bold; line 185 — the STATUS cell's `.foreground_color`, defaulting to `Ansi256(8)`. This is the most severe case: for those three statuses, status is conveyed *only* by a color that is unreadable on a dark theme.
+- `lib/apps/fabro-cli/src/commands/model.rs`
+  - `fn model_row` (lines 122–148): line 135 (PROVIDER cell), line 138 (ALIASES cell).
+  - Note: this file has its own private `color_if` (lines 110–112), duplicating `crate::shared::utilities::color_if` (`lib/apps/fabro-cli/src/shared/utilities.rs:166`) used by the other three files. Not itself a defect; relevant only if the fix touches a shared helper.
+- `lib/apps/fabro-cli/src/commands/workflow/list.rs`
+  - `fn print_section` (lines 74–136): line 113 — DESCRIPTION cell.
+- `lib/apps/fabro-cli/src/commands/run/checkpoints.rs`
+  - `fn print_timeline` (lines 55–118): line 93 — Details cell.
+
+Shared primitive available for reuse: `fabro_util::terminal::Styles::dim` at `lib/foundation/fabro-util/src/terminal.rs:28`.
+
+**Proposed mechanism (from diagnosis):** Replace `.foreground_color(color_if(use_color, Color::Ansi256(8)))` with `.dimmed(use_color)` at all ten sites. For `runs/list.rs::status_cell`, the `Ansi256(8)` value doubles as a sentinel for bold-suppression logic (`color != Some(Color::Ansi256(8))`) and as the default status color — this requires restructuring (e.g. an explicit `is_dim` flag alongside the existing `Option<Color>`), not a pure search-and-replace, so that no `Ansi256(8)`-sentinel comparison remains anywhere. After the fix, no `Color::Ansi256(8)` should remain anywhere in `lib/apps/fabro-cli/src`.
+
+## 2. Logged reproduction steps (must be re-runnable exactly as recorded)
+
+**Preconditions and data:**
+- Repo checked out at the current branch tip, working tree clean.
+- Cwd = repo root (so `.fabro/workflows/*/workflow.toml` — 17 project workflow definitions already present in the repo — are discovered as "Project Workflows"). No fixture data needs to be created.
+- No running Fabro server, no `settings.toml`, no account/credentials required — `fabro workflow list` never contacts a server.
+- Environment variables `TERM=xterm-256color` and `CLICOLOR_FORCE=1` must be set on the command in step 2 (sandbox has no real tty; on a real dark-background terminal, plain `fabro workflow list` reproduces with no env vars — these are a sandbox-only substitute for "has a color-capable tty," not part of the bug's actual trigger condition).
+
+**Ordered minimal actions:**
+1. `cargo build -p fabro-cli` — produces `target/debug/fabro`. (One-time; not required on subsequent runs once the binary exists.)
+2. `TERM=xterm-256color CLICOLOR_FORCE=1 ./target/debug/fabro workflow list 2>&1 | cat -v`
+
+**Observed (wrong) result:** Every row under "Project Workflows" emits, for the DESCRIPTION cell, the literal escape `\x1b[38;5;8m` (SGR "set foreground to 256-color palette index 8") — verbatim captured output:
+```
+^[[0m^[[0m ^[[0m^[[0m^[[0m^[[38;5;8m           ^[[0m ^[[0m
+```
+Contrast: the adjacent NAME cell in the identical row renders `^[[36m` (plain ANSI cyan), confirming color reaches the output stream correctly and the DESCRIPTION column's `38;5;8` is the specific, isolated defect.
+
+**Expected result:** The DESCRIPTION cell (and the other nine confirmed call sites) should emit the terminal-relative dim/faint attribute `\x1b[2m` (SGR 2) instead of the absolute-palette `\x1b[38;5;8m`, so it renders as a dimmed variant of whatever foreground the user's terminal theme actually uses — legible on both light and dark backgrounds.
+
+**Reliability:** Reproduces deterministically, 3/3 consecutive runs, byte-identical output each time. Not intermittent.
+
+**Secondary, statically-verified site (not driven live — requires a running server unavailable in this environment):** `fabro ps` (maps to `runs/list.rs::list_command`/`status_cell`) has an identical code path (`color_if(use_color, Color::Ansi256(8))`, plus the `status_cell` sentinel logic) and should be covered by the fix and by a test, even though it could not be exercised via a live CLI run.
+
+The plan's validation step must be able to re-run exactly the two ordered actions above and confirm the observed escape changes from `\x1b[38;5;8m` to `\x1b[2m` (and that `\x1b[38;5;8m` no longer appears) in the DESCRIPTION cell output.
+
+## 3. No-regression constraint (hard constraint on every step of the plan)
+
+Do not remove, disable, or weaken any working functionality in order to make the symptom disappear. Specifically:
+- The existing `use_color`/`color_if` gating (so `NO_COLOR` / non-tty output remains uncolored) must be preserved unchanged — `.dimmed(use_color)` must mirror the same boolean gating `color_if(use_color, ...)` currently provides, not bypass it.
+- All non-`Ansi256(8)` colors at these sites (e.g. `Cyan` on NAME cells, per-status colors like green/red/yellow in `status_cell`) must remain untouched.
+- `status_cell`'s status-conveying behavior (which status maps to which visual treatment) must be preserved — only the specific mechanism for "dim/gray" changes from an absolute color to a relative attribute; no status should lose its distinguishing treatment.
+- This is a hard constraint on every step of the plan, not a preference: any step that would delete a color/status case, silence a warning by removing code, or otherwise narrow existing behavior instead of fixing the color mechanism is out of scope and must not be taken.
+
+## 4. Regression test requirement
+
+The plan must include a new test (this project uses `cargo nextest`; no existing test in these four files currently asserts on emitted ANSI/SGR bytes) that:
+- Forces `use_color = true`.
+- Renders the affected cell(s) through the real `cli-table` builder (or the smallest slice of the real code path that reaches `.dimmed`/`.foreground_color`).
+- Asserts the rendered output contains `\x1b[2m` (SGR faint) and does NOT contain `\x1b[38;5;8m` for the secondary/status cell(s).
+- Fails against the current (unfixed) code and passes once the fix is applied — this must be demonstrated as part of the plan's validation, not just asserted.
+- Should cover both the plain dim-cell case (e.g. `workflow/list.rs` DESCRIPTION cell) and the `status_cell` restructured case in `runs/list.rs`, since that one has the extra sentinel-removal logic.
+
+## 5. Escalation reason (scope the plan to this reality)
+
+Escalated via the checklist item **"touches more than about two files."** The fix requires coordinated changes across four files (`lib/apps/fabro-cli/src/commands/runs/list.rs`, `model.rs`, `workflow/list.rs`, `run/checkpoints.rs`), plus new regression test coverage. It also includes a small logic restructuring in `runs/list.rs::status_cell` (replacing the `Ansi256(8)`-as-sentinel comparison with an explicit `is_dim` flag) — not a pure mechanical search-and-replace. No new abstraction/interface, schema/API, or migration change is involved; scope the plan to "coordinated multi-file mechanical fix + one small logic restructuring + new test," not to any larger architectural change.
