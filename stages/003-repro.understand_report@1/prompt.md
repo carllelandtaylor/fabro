@@ -1,0 +1,126 @@
+Goal: BUG: CLI table text is unreadable on dark terminal themes.
+
+SYMPTOM
+Secondary text in `fabro` CLI tables is hardcoded to `Color::Ansi256(8)` ("bright
+black" — a fixed dark grey from the palette). That assumes a light terminal
+background; on a dark theme it renders nearly invisible against the background.
+Reproduced by the user with `fabro workflow list`, where the DESCRIPTION column
+is unreadable.
+
+LOCATIONS — 10 occurrences in 4 files, all under
+lib/apps/fabro-cli/src/commands/
+  runs/list.rs         6  (lines 128, 138, 148, 178, 184, 185)
+  model.rs             2  (lines 135, 138)
+  workflow/list.rs     1  (line 113)
+  run/checkpoints.rs   1  (line 93)
+
+runs/list.rs is the worst case: line 178 uses Ansi256(8) as a *status* color and
+line 184 suppresses bold for it, so a run status is conveyed entirely by a color
+the user cannot see. This is not purely cosmetic.
+
+SUSPECTED CAUSE
+An absolute palette index is used where a terminal-relative attribute belongs.
+The codebase already has the right primitive: `fabro_util::terminal::Styles::dim`
+= `Style::new().dim()` at lib/foundation/fabro-util/src/terminal.rs:28. It emits
+SGR 2 (faint) against the terminal's own foreground, so it adapts to the theme.
+workflow/list.rs already uses `styles.dim` for the section path in
+`print_section` — the table cells in the same file just don't.
+
+OPEN QUESTION — resolve this before choosing the fix
+Does cli-table 0.5's `CellStruct` expose a faint/dim attribute the way it exposes
+`.bold(bool)`? Check the actual crate source in the cargo registry rather than
+guessing. Three ways it can go:
+  a) If CellStruct has a faint/dim attribute, use it. Cleanest.
+  b) Otherwise pre-apply the dim style to the string before `.cell()`. Risk:
+     cli-table's column width measurement may count the embedded ANSI escape
+     codes and mis-align the table. Verify alignment if taking this path.
+  c) As a last resort pick a mid-tone color readable on both light and dark
+     backgrounds — but this still absolutizes what should be relative.
+
+Note all styling here already goes through the `use_color` flag via
+`color_if()`, so the no-color path is unaffected either way.
+
+CONTRIBUTION PATH
+Per CONTRIBUTING.md this qualifies as a "bug fix / small improvement" — send a
+PR directly, no issue needed. Fork remote is carltaylor/fabro; upstream push is
+disabled. Branch from main and open the PR against fabro-sh/fabro main, e.g.
+
+  gh pr create --repo fabro-sh/fabro --base main --head carltaylor:<branch>
+
+REQUIRED CHECKS (CONTRIBUTING.md's list is stale relative to CI — use these)
+  cargo nextest run --workspace
+  cargo +nightly-2026-04-14 fmt --check --all
+  cargo +nightly-2026-04-14 clippy --workspace --all-targets -- -D warnings
+The pinned nightly matters: stable rustfmt will not match CI.
+
+VERIFICATION
+No existing test covers this. Add one asserting the faint attribute (or whatever
+the chosen mechanism emits) so this cannot regress. Manually verify the rendered
+output against both a light and a dark terminal profile.
+
+
+## Completed stages
+- **understand_locate**: succeeded
+  - Model: claude-sonnet-5
+
+
+Understand the bug report. The input is either a GitHub Issue number or a free-text description of the symptom: BUG: CLI table text is unreadable on dark terminal themes.
+
+SYMPTOM
+Secondary text in `fabro` CLI tables is hardcoded to `Color::Ansi256(8)` ("bright
+black" — a fixed dark grey from the palette). That assumes a light terminal
+background; on a dark theme it renders nearly invisible against the background.
+Reproduced by the user with `fabro workflow list`, where the DESCRIPTION column
+is unreadable.
+
+LOCATIONS — 10 occurrences in 4 files, all under
+lib/apps/fabro-cli/src/commands/
+  runs/list.rs         6  (lines 128, 138, 148, 178, 184, 185)
+  model.rs             2  (lines 135, 138)
+  workflow/list.rs     1  (line 113)
+  run/checkpoints.rs   1  (line 93)
+
+runs/list.rs is the worst case: line 178 uses Ansi256(8) as a *status* color and
+line 184 suppresses bold for it, so a run status is conveyed entirely by a color
+the user cannot see. This is not purely cosmetic.
+
+SUSPECTED CAUSE
+An absolute palette index is used where a terminal-relative attribute belongs.
+The codebase already has the right primitive: `fabro_util::terminal::Styles::dim`
+= `Style::new().dim()` at lib/foundation/fabro-util/src/terminal.rs:28. It emits
+SGR 2 (faint) against the terminal's own foreground, so it adapts to the theme.
+workflow/list.rs already uses `styles.dim` for the section path in
+`print_section` — the table cells in the same file just don't.
+
+OPEN QUESTION — resolve this before choosing the fix
+Does cli-table 0.5's `CellStruct` expose a faint/dim attribute the way it exposes
+`.bold(bool)`? Check the actual crate source in the cargo registry rather than
+guessing. Three ways it can go:
+  a) If CellStruct has a faint/dim attribute, use it. Cleanest.
+  b) Otherwise pre-apply the dim style to the string before `.cell()`. Risk:
+     cli-table's column width measurement may count the embedded ANSI escape
+     codes and mis-align the table. Verify alignment if taking this path.
+  c) As a last resort pick a mid-tone color readable on both light and dark
+     backgrounds — but this still absolutizes what should be relative.
+
+Note all styling here already goes through the `use_color` flag via
+`color_if()`, so the no-color path is unaffected either way.
+
+CONTRIBUTION PATH
+Per CONTRIBUTING.md this qualifies as a "bug fix / small improvement" — send a
+PR directly, no issue needed. Fork remote is carltaylor/fabro; upstream push is
+disabled. Branch from main and open the PR against fabro-sh/fabro main, e.g.
+
+  gh pr create --repo fabro-sh/fabro --base main --head carltaylor:<branch>
+
+REQUIRED CHECKS (CONTRIBUTING.md's list is stale relative to CI — use these)
+  cargo nextest run --workspace
+  cargo +nightly-2026-04-14 fmt --check --all
+  cargo +nightly-2026-04-14 clippy --workspace --all-targets -- -D warnings
+The pinned nightly matters: stable rustfmt will not match CI.
+
+VERIFICATION
+No existing test covers this. Add one asserting the faint attribute (or whatever
+the chosen mechanism emits) so this cannot regress. Manually verify the rendered
+output against both a light and a dark terminal profile.
+. If you were given an issue number, read the full report with gh issue view <n>, including comments via gh issue view <n> --comments; otherwise use the free-text description provided. Extract the essentials: EXPECTED BEHAVIOR — what should happen; ACTUAL BEHAVIOR — what goes wrong, the symptom; AFFECTED AREA — which screen, command, endpoint or module is involved; and any preconditions, inputs, environment, or exact steps the report already provides. If the affected area is a visual view with an evergreen spec at docs/design/<surface>/views/<view>/<view>.html, discoverable via docs/design/index.md, use it as the authority for intended design: read it for the intended behaviour and states, and when the bug is about appearance — layout, spacing, color, alignment — render the spec by serving it and screenshotting with Playwright, then compare it against a render of the running app while reproducing, rather than judging intent from the markup. Finally, search the codebase for the relevant code by feature name, route, error string, command or UI label, so you know where the behavior lives and what to watch while reproducing. Never guess that a bug reproduces without observing it.
