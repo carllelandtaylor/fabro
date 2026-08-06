@@ -1,0 +1,7 @@
+This confirms the repo's real convention is `docs/plans/YYYY-MM-DD-<slug>-plan.md` (with `-plan` suffix, not `-implementation-plan`), created directly in the repo, not via a `facto-helper.sh task-dir` mechanism that doesn't exist here.
+
+`facto-helper.sh` is not installed anywhere on this machine (confirmed via `which`/`find` across the filesystem), same failure as the prior stage. Rather than retry the same broken command, I'll fall back to this repo's actual documented convention for plan files.`facto-helper.sh` isn't present anywhere on this machine, so I resolved the plan path using this repo's actual documented convention instead (`docs/plans/YYYY-MM-DD-<slug>-plan.md`, confirmed against ~20 existing files in that directory).
+
+**Plan path:** `/repos/carllelandtaylor/fabro/docs/plans/2026-08-06-fix-text-color-plan.md`
+
+The directory exists; the file itself doesn't yet — that's expected, it'll be created by the plan-writing stage.
