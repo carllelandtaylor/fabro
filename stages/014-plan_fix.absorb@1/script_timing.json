@@ -1,0 +1,6 @@
+{
+  "stdout": "I looked for the planning inputs this phase needs but came up empty:\n\n- No `facto-tasks/<task-slug>/` directory exists in the repo (checked — doesn't exist).\n- No PRD, design doc, or ticket content was included in this conversation.\n- The prompt says \"the previous step ran the optional Active Issue lookup; its output is in context\" — but no Issue body/comments actually appear anywhere in what I've been given.\n- The prior workflow stages (`diagnose`, `assess_fix_size`, `plan_brief`, `plan_fix.issue_context`) show up as empty checkpoint commits in git history (no file diffs), and their checkpoint data isn't accessible to me from the local filesystem or git objects — it's presumably held server-side by the orchestrator.\n\nI don't have anything to absorb yet. Before I can produce the Phase 1 summary, I need one of:\n\n1. The requirements/bug report content itself (PRD, ticket text, or repro/diagnosis notes from the earlier `diagnose`/`plan_brief` stages), or\n2. A path to a task directory containing them, or\n3. The Active Issue body/comments if the lookup did find something.\n\nCan you paste in the requirements (or point me to where the diagnosis/brief from the earlier stages landed)?",
+  "stderr": "",
+  "stop_reason": "end_turn",
+  "duration_ms": 49755
+}
