@@ -1,0 +1,20 @@
+I'll investigate the bug report by examining the flagged code locations and resolving the open question about cli-table's capabilities.All 10 locations confirmed. Now let me resolve the open question — checking the actual cli-table crate source for a dim/faint attribute on CellStruct.Resolved the open question: `CellStruct` implements a `Style` trait with `.dimmed(bool)` (cell.rs:199-202) — option (a) from the bug report. Let me check how it maps to the terminal color spec.Investigation complete. Here's the synthesis:
+
+**EXPECTED BEHAVIOR**: Secondary/dim text in CLI tables (IDs, descriptions, aliases, provider names, checkpoint details) should remain legibly distinguished-but-readable from primary text regardless of the terminal's background theme.
+
+**ACTUAL BEHAVIOR**: These cells use `Color::Ansi256(8)`, a fixed dark-grey palette index. On dark-background terminals this renders as near-invisible dark grey on dark background. In `runs/list.rs`, `Ansi256(8)` is also reused as a *status* color (for `Submitted`/`Pending`/`Dead`) with bold suppressed, so those run statuses are conveyed by an invisible color alone.
+
+**AFFECTED AREA**: `lib/apps/fabro-cli/src/commands/` table rendering — confirmed all 10 occurrences exactly as reported:
+- `runs/list.rs`: 128, 138, 148 (secondary columns), 178/184/185 (status color + bold suppression)
+- `model.rs`: 135, 138 (provider, aliases)
+- `workflow/list.rs`: 113 (description)
+- `run/checkpoints.rs`: 93 (detail string)
+
+**OPEN QUESTION RESOLVED — option (a) applies.** Checked the actual `cli-table 0.5.0` source in the cargo registry (not guessed):
+- `cell.rs:168-203`: `CellStruct` implements the crate's `Style` trait, which includes `fn dimmed(self, dimmed: bool) -> Self` alongside `bold`/`underline`/`italic`.
+- `style.rs:79-82`: `dimmed` flows into `termcolor::ColorSpec::set_dimmed`.
+- `termcolor-1.4.1/src/lib.rs:1525-1526`: when `spec.dimmed` is set, termcolor writes raw `\x1B[2m` — SGR 2, faint — the identical escape code emitted by `console::Style::dim()` (used elsewhere via `fabro_util::terminal::Styles::dim`).
+
+So `CellStruct::dimmed(use_color)` is a direct, terminal-relative replacement for `.foreground_color(color_if(use_color, Color::Ansi256(8)))` — no color-spec pre-styling, no risk of cli-table's width measurement double-counting embedded ANSI escapes (since `dimmed` is a native cell attribute, not baked into the string), and no absolutized mid-tone compromise. For `runs/list.rs`'s status cell, the fix is to stop using `Ansi256(8)` as a color entirely and instead leave `foreground_color` unset (default terminal foreground) while setting `.dimmed(use_color)`, restoring bold/dim as the actual status signal instead of an invisible color.
+
+This confirms the bug report's suspected cause and locations are accurate, and clears the way to implement the fix (replace all 10 `Ansi256(8)` foreground-color usages with `.dimmed(use_color)`, and rework the `runs/list.rs` status-color match arm so `Submitted`/`Pending`/`Dead` render as dim default-foreground text rather than a fixed invisible color) plus add a coverage test asserting the `\x1B[2m` dim escape appears in rendered output.
