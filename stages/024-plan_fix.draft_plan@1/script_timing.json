@@ -1,0 +1,6 @@
+{
+  "stdout": "I'll write the plan to `/repos/carllelandtaylor/fabro/docs/plans/2026-08-06-fix-text-color-plan.md`.The plan is written to `/repos/carllelandtaylor/fabro/docs/plans/2026-08-06-fix-text-color-plan.md`.\n\nIt lays out 4 risk-ordered steps (one commit each): `runs/list.rs` first (the only non-mechanical change — restructuring `status_cell`'s color/bold/dim logic away from the `Ansi256(8)` sentinel), then the three purely mechanical sites in `workflow/list.rs`, `run/checkpoints.rs`, and `model.rs`. Each step swaps `.foreground_color(color_if(use_color, Color::Ansi256(8)))` for `.dimmed(use_color)`, adds unit tests that render real `CellStruct`s and assert on the emitted `\\x1b[2m` vs `\\x1b[38;5;8m` bytes, and includes validation/commit-message blocks. The plan also carries forward the Verification Coverage table and flags the one unautomatable risk (manual legibility check on a real dark terminal) plus the two live-server-dependent manual checks, and closes with a full Test Plan covering build, workspace tests, fmt, clippy, the `Ansi256(8)` grep, insta snapshots, and the exact logged repro commands.",
+  "stderr": "",
+  "stop_reason": "end_turn",
+  "duration_ms": 176969
+}
