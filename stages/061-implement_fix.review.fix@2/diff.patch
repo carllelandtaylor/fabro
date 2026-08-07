@@ -1,0 +1,292 @@
+diff --git a/docs/plans/2026-08-06-fix-text-color-plan.md b/docs/plans/2026-08-06-fix-text-color-plan.md
+index 51a2c73..73b3d25 100644
+--- a/docs/plans/2026-08-06-fix-text-color-plan.md
++++ b/docs/plans/2026-08-06-fix-text-color-plan.md
+@@ -1,15 +1,15 @@
+ ---
+ title: "fix: dim CLI table cells instead of hardcoding Ansi256(8)"
+ type: fix
+-status: active
++status: completed
+ date: 2026-08-06
+ ---
+ 
+ # fix: dim CLI table cells instead of hardcoding Ansi256(8)
+ 
+-Based on `.facto/bug-brief.md` (root cause, verified code locations, logged
+-reproduction steps) and `.facto/brief.md` (fix planning brief), plus the
+-decisions recorded in `plan_fix.record_decisions`. Created 2026-08-06.
++Based on the bug report's root cause analysis (verified code locations,
++logged reproduction steps) and the fix planning brief, plus the decisions
++recorded in `plan_fix.record_decisions`. Created 2026-08-06.
+ 
+ ## Overview
+ 
+@@ -25,12 +25,13 @@ This plan replaces all ten sites with `.dimmed(use_color)`, restructures
+ bold-suppression sentinel, and adds regression tests that assert on the
+ actual emitted ANSI/SGR bytes.
+ 
+-## Root Cause (from `.facto/bug-brief.md`)
++## Root Cause
+ 
+ - `lib/apps/fabro-cli/src/commands/runs/list.rs` — `list_command` (lines 128,
+   138, 148) and `status_cell` (lines 171–186, the most severe case: status is
+-  conveyed only by color for `Submitted | Pending | Dead`, and `Ansi256(8)`
+-  doubles as a bold-suppression sentinel there).
++  conveyed only by the presence/absence of bold and color together for
++  `Submitted | Pending | Dead`, and `Ansi256(8)` doubles as a
++  bold-suppression sentinel there).
+ - `lib/apps/fabro-cli/src/commands/model.rs` — `model_row` (lines 135, 138).
+ - `lib/apps/fabro-cli/src/commands/workflow/list.rs` — `print_section` (line
+   113).
+diff --git a/lib/apps/fabro-cli/src/commands/model.rs b/lib/apps/fabro-cli/src/commands/model.rs
+index eb4cc5c..dd5960c 100644
+--- a/lib/apps/fabro-cli/src/commands/model.rs
++++ b/lib/apps/fabro-cli/src/commands/model.rs
+@@ -654,10 +654,20 @@ mod tests {
+         let model: Model =
+             serde_json::from_value(test_model_json("test-model", ProviderId::anthropic())).unwrap();
+ 
+-        let provider_cell = render_row(
+-            vec![model_row(&model, true).into_iter().nth(1).unwrap()],
+-            true,
+-        );
++        // Columns: MODEL, PROVIDER, ALIASES, CONTEXT, COST, SPEED.
++        let row = model_row(&model, true);
++        let [
++            _model_cell,
++            provider_cell,
++            aliases_cell,
++            _context_cell,
++            _cost_cell,
++            speed_cell,
++        ]: [_; 6] = row
++            .try_into()
++            .unwrap_or_else(|_| panic!("expected 6 columns"));
++
++        let provider_cell = render_row(vec![provider_cell]);
+         assert!(
+             provider_cell.contains("\x1b[2m"),
+             "expected PROVIDER cell to carry dim SGR, got: {provider_cell:?}"
+@@ -667,10 +677,7 @@ mod tests {
+             "expected no Ansi256(8) SGR on PROVIDER cell, got: {provider_cell:?}"
+         );
+ 
+-        let aliases_cell = render_row(
+-            vec![model_row(&model, true).into_iter().nth(2).unwrap()],
+-            true,
+-        );
++        let aliases_cell = render_row(vec![aliases_cell]);
+         assert!(
+             aliases_cell.contains("\x1b[2m"),
+             "expected ALIASES cell to carry dim SGR, got: {aliases_cell:?}"
+@@ -679,13 +686,19 @@ mod tests {
+             !aliases_cell.contains("\x1b[38;5;8m"),
+             "expected no Ansi256(8) SGR on ALIASES cell, got: {aliases_cell:?}"
+         );
++
++        let speed_cell = render_row(vec![speed_cell]);
++        assert!(
++            speed_cell.contains("\x1b[36m"),
++            "expected SPEED cell to carry Cyan SGR, got: {speed_cell:?}"
++        );
+     }
+ 
+     #[test]
+     fn model_row_no_color_has_no_escape_bytes() {
+         let model: Model =
+             serde_json::from_value(test_model_json("test-model", ProviderId::anthropic())).unwrap();
+-        let rendered = render_row(model_row(&model, false), true);
++        let rendered = render_row(model_row(&model, false));
+         assert!(
+             !has_style_escape(&rendered),
+             "expected no style SGR when model_row is built with use_color=false, got: {rendered:?}"
+diff --git a/lib/apps/fabro-cli/src/commands/run/checkpoints.rs b/lib/apps/fabro-cli/src/commands/run/checkpoints.rs
+index 3effdaf..753fa12 100644
+--- a/lib/apps/fabro-cli/src/commands/run/checkpoints.rs
++++ b/lib/apps/fabro-cli/src/commands/run/checkpoints.rs
+@@ -132,21 +132,33 @@ mod tests {
+     }
+ 
+     #[test]
+-    fn detail_cell_dims_instead_of_ansi256() {
+-        let rendered = render_row(timeline_row(&test_entry(), true), true);
++    fn timeline_row_ordinal_cyan_and_detail_dims_instead_of_ansi256() {
++        // Columns: @, Node, Details.
++        let row = timeline_row(&test_entry(), true);
++        let [ordinal_cell, _node_cell, detail_cell]: [_; 3] = row
++            .try_into()
++            .unwrap_or_else(|_| panic!("expected 3 columns"));
++
++        let ordinal_cell = render_row(vec![ordinal_cell]);
+         assert!(
+-            rendered.contains("\x1b[2m"),
+-            "expected dim SGR, got: {rendered:?}"
++            ordinal_cell.contains("\x1b[36m"),
++            "expected ordinal cell to carry Cyan SGR, got: {ordinal_cell:?}"
++        );
++
++        let detail_cell = render_row(vec![detail_cell]);
++        assert!(
++            detail_cell.contains("\x1b[2m"),
++            "expected DETAILS cell to carry dim SGR, got: {detail_cell:?}"
+         );
+         assert!(
+-            !rendered.contains("\x1b[38;5;8m"),
+-            "expected no Ansi256(8) SGR, got: {rendered:?}"
++            !detail_cell.contains("\x1b[38;5;8m"),
++            "expected no Ansi256(8) SGR on DETAILS cell, got: {detail_cell:?}"
+         );
+     }
+ 
+     #[test]
+     fn detail_cell_no_color_has_no_escape_bytes() {
+-        let rendered = render_row(timeline_row(&test_entry(), false), true);
++        let rendered = render_row(timeline_row(&test_entry(), false));
+         assert!(
+             !has_style_escape(&rendered),
+             "expected no style SGR when timeline_row is built with use_color=false, got: {rendered:?}"
+diff --git a/lib/apps/fabro-cli/src/commands/runs/list.rs b/lib/apps/fabro-cli/src/commands/runs/list.rs
+index 5215e74..646e9f8 100644
+--- a/lib/apps/fabro-cli/src/commands/runs/list.rs
++++ b/lib/apps/fabro-cli/src/commands/runs/list.rs
+@@ -247,7 +247,7 @@ mod tests {
+             },
+             RunStatus::Dead,
+         ] {
+-            let rendered = render_cell(status_cell(status, true), true);
++            let rendered = render_cell(status_cell(status, true));
+             assert!(
+                 rendered.contains("\x1b[2m"),
+                 "expected dim SGR for {status:?}, got: {rendered:?}"
+@@ -291,7 +291,7 @@ mod tests {
+             (RunStatus::Paused { prior_block: None }, "\x1b[35m"),
+         ];
+         for (status, expected_fg) in cases {
+-            let rendered = render_cell(status_cell(status, true), true);
++            let rendered = render_cell(status_cell(status, true));
+             assert!(
+                 rendered.contains("\x1b[1m"),
+                 "expected bold SGR for {status:?}, got: {rendered:?}"
+@@ -309,10 +309,14 @@ mod tests {
+ 
+     #[test]
+     fn status_cell_emits_no_escapes_when_color_disabled() {
+-        let rendered = render_cell(status_cell(RunStatus::Dead, false), true);
+-        assert!(
+-            !has_style_escape(&rendered),
+-            "expected no style SGR when status_cell is built with use_color=false, got: {rendered:?}"
+-        );
++        for status in [RunStatus::Dead, RunStatus::Succeeded {
++            reason: SuccessReason::Completed,
++        }] {
++            let rendered = render_cell(status_cell(status, false));
++            assert!(
++                !has_style_escape(&rendered),
++                "expected no style SGR when status_cell is built with use_color=false for {status:?}, got: {rendered:?}"
++            );
++        }
+     }
+ }
+diff --git a/lib/apps/fabro-cli/src/commands/test_support.rs b/lib/apps/fabro-cli/src/commands/test_support.rs
+index 40a2ad5..d4db744 100644
+--- a/lib/apps/fabro-cli/src/commands/test_support.rs
++++ b/lib/apps/fabro-cli/src/commands/test_support.rs
+@@ -1,29 +1,34 @@
+-#![cfg(test)]
+-
+ use cli_table::{CellStruct, Table};
+ 
+-pub(crate) fn render_row(row: Vec<CellStruct>, use_color: bool) -> String {
+-    let color_choice = if use_color {
+-        cli_table::ColorChoice::Always
+-    } else {
+-        cli_table::ColorChoice::Never
+-    };
++pub(crate) fn render_row(row: Vec<CellStruct>) -> String {
+     vec![row]
+         .table()
+-        .color_choice(color_choice)
++        .color_choice(cli_table::ColorChoice::Always)
+         .display()
+         .unwrap()
+         .to_string()
+ }
+ 
+-pub(crate) fn render_cell(cell: CellStruct, use_color: bool) -> String {
+-    render_row(vec![cell], use_color)
++pub(crate) fn render_cell(cell: CellStruct) -> String {
++    render_row(vec![cell])
+ }
+ 
+ /// `cli-table` emits an unconditional `\x1b[0m` reset around every cell/border
+ /// under `ColorChoice::Always`, even when no style was applied. So "no color"
+-/// assertions must check for the absence of specific style SGRs (bold, dim,
+-/// foreground color) rather than the absence of any escape byte.
++/// assertions must check for the presence of a non-reset SGR code, not just
++/// any escape byte.
+ pub(crate) fn has_style_escape(rendered: &str) -> bool {
+-    rendered.contains("\x1b[1m") || rendered.contains("\x1b[2m") || rendered.contains("\x1b[3")
++    let mut rest = rendered;
++    while let Some(seq_start) = rest.find("\x1b[") {
++        rest = &rest[seq_start + 2..];
++        let Some(end) = rest.find('m') else {
++            break;
++        };
++        let code = &rest[..end];
++        if !(code.is_empty() || code == "0") {
++            return true;
++        }
++        rest = &rest[end + 1..];
++    }
++    false
+ }
+diff --git a/lib/apps/fabro-cli/src/commands/workflow/list.rs b/lib/apps/fabro-cli/src/commands/workflow/list.rs
+index 3dc2672..ccbde78 100644
+--- a/lib/apps/fabro-cli/src/commands/workflow/list.rs
++++ b/lib/apps/fabro-cli/src/commands/workflow/list.rs
+@@ -157,24 +157,38 @@ mod tests {
+         }
+     }
+ 
++    #[test]
++    fn name_cell_has_cyan_color() {
++        let workflow = test_workflow("goal text");
++        let name_cell = render_row(vec![
++            workflow_row(&workflow, true).into_iter().next().unwrap(),
++        ]);
++        assert!(
++            name_cell.contains("\x1b[36m"),
++            "expected NAME cell to carry Cyan SGR, got: {name_cell:?}"
++        );
++    }
++
+     #[test]
+     fn goal_cell_dims_instead_of_ansi256() {
+         let workflow = test_workflow("goal text");
+-        let rendered = render_row(workflow_row(&workflow, true), true);
++        let description_cell = render_row(vec![
++            workflow_row(&workflow, true).into_iter().nth(1).unwrap(),
++        ]);
+         assert!(
+-            rendered.contains("\x1b[2m"),
+-            "expected dim SGR, got: {rendered:?}"
++            description_cell.contains("\x1b[2m"),
++            "expected DESCRIPTION cell to carry dim SGR, got: {description_cell:?}"
+         );
+         assert!(
+-            !rendered.contains("\x1b[38;5;8m"),
+-            "expected no Ansi256(8) SGR, got: {rendered:?}"
++            !description_cell.contains("\x1b[38;5;8m"),
++            "expected no Ansi256(8) SGR on DESCRIPTION cell, got: {description_cell:?}"
+         );
+     }
+ 
+     #[test]
+     fn goal_cell_no_color_has_no_escape_bytes() {
+         let workflow = test_workflow("goal text");
+-        let rendered = render_row(workflow_row(&workflow, false), true);
++        let rendered = render_row(workflow_row(&workflow, false));
+         assert!(
+             !has_style_escape(&rendered),
+             "expected no style SGR when workflow_row is built with use_color=false, got: {rendered:?}"
