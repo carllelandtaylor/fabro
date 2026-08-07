@@ -108,9 +108,7 @@ fn print_section(
                     .clone()
                     .cell()
                     .foreground_color(color_if(use_color, Color::Cyan)),
-                goal_str
-                    .cell()
-                    .foreground_color(color_if(use_color, Color::Ansi256(8))),
+                goal_str.cell().dimmed(use_color),
             ]
         })
         .collect();
@@ -141,5 +139,41 @@ fn truncate_str(s: &str, max: usize) -> String {
         first_line.to_string()
     } else {
         format!("{}...", &first_line[..max - 3])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn render_cell(cell: CellStruct) -> String {
+        vec![vec![cell]]
+            .table()
+            .color_choice(cli_table::ColorChoice::Always)
+            .display()
+            .unwrap()
+            .to_string()
+    }
+
+    #[test]
+    fn goal_cell_dims_instead_of_ansi256() {
+        let rendered = render_cell("goal text".cell().dimmed(true));
+        assert!(
+            rendered.contains("\x1b[2m"),
+            "expected dim SGR, got: {rendered:?}"
+        );
+        assert!(
+            !rendered.contains("\x1b[38;5;8m"),
+            "expected no Ansi256(8) SGR, got: {rendered:?}"
+        );
+    }
+
+    #[test]
+    fn goal_cell_no_color_has_no_escape_bytes() {
+        let rendered = render_cell("goal text".cell().dimmed(false));
+        assert!(
+            !rendered.contains("\x1b["),
+            "expected no ANSI escape bytes, got: {rendered:?}"
+        );
     }
 }
