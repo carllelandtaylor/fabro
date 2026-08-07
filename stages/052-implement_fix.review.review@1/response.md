@@ -1,0 +1,24 @@
+## Review results — cycle 1 of 5
+
+Reviewed via subagent (opus) that read `git diff 0abf2297c00a90013a93ae01c6c139b7b85b1b1f..HEAD` and all four changed files in full, then verified findings with two mutation tests (deliberately reintroducing bugs to see if the new tests catch them).
+
+**Bottom line:** the production fix itself is correct and complete — all 10 sites verified fixed, `status_cell`'s status→visual mapping preserved exactly, clippy/fmt/tests all pass. The problems are all in the new regression tests: several are tautological and would not catch a regression of the very bug they're meant to guard.
+
+### IN-SCOPE
+
+1. **[important]** `workflow/list.rs:163-183` and `run/checkpoints.rs:136-156` — the new tests construct their own cell literal instead of calling the fixed production code (`print_section`/`print_timeline`). Mutation-verified: reverting the actual fix at `workflow/list.rs:111` leaves these tests green. Fix: extract a small `goal_cell(...)`/`detail_cell(...)` (or row-building) helper that the test can call.
+2. **[important]** `runs/list.rs:316-323`, `model.rs:680-689`, `workflow/list.rs:176-183`, `run/checkpoints.rs:149-156` — all four `use_color=false` tests render with `ColorChoice::Never`, which strips all styling unconditionally, so they can't detect broken `use_color` gating. Mutation-verified: a `status_cell` that ignores `use_color` entirely still passes. Fix: render with `ColorChoice::Always` and assert the specific style SGRs (`\x1b[2m`, `\x1b[1m`) are absent, since cli-table emits `\x1b[0m` resets unconditionally.
+3. **[minor]** `runs/list.rs:254-273` — dim-status test doesn't assert bold is suppressed; the `!is_dim` bold term is untested.
+4. **[minor]** `model.rs:665-678` — asserts only that `\x1b[2m` appears somewhere in the row, not that both PROVIDER and ALIASES cells are dimmed.
+5. **[minor]** `.facto/brief.md`, `.facto/bug-brief.md`, `.facto/result.md` — agent scratch artifacts (253 lines) committed to the branch; not gitignored, not a repo convention like `docs/plans/`.
+6. **[minor]** `render_cell`/`render_row` test helper duplicated near-verbatim across all four files — any fix to finding #2 needs applying 4x.
+7. **[minor]** `Starting`, `Runnable`, `Removing` status variants untested in the new `status_cell` cases array, despite the plan claiming per-variant coverage.
+
+### OUT-OF-SCOPE
+
+- **A. [important]** `workflow/list.rs::truncate_str` (lines 136-143) byte-slices a UTF-8 string (`&first_line[..max-3]`), which can panic `fabro workflow list` on any multi-byte character past the truncation offset. The sibling `runs/list.rs::truncate_str` already does this correctly with `.chars()`. Pre-existing, unrelated to this diff, but flagged for visibility.
+- **B. [minor]** Inconsistent error handling: `print_section` panics via `.expect(...)` on render failure while `print_timeline` silently swallows the same error.
+- **C. [minor]** `checkpoints.rs::short_id` byte-slices an assumed-ASCII run id; `usize::try_from(...).expect(...)` panics on malformed server data.
+- **D. [minor]** `model.rs` has a private duplicate of the shared `color_if` helper (pre-existing, noted but out of scope per the brief).
+
+Given two **important**-severity in-scope findings (tautological tests that don't actually guard the constraints they claim to), another review cycle is warranted after these are addressed — recommend fixing #1 and #2 (and ideally #3/#4 while touching the same code) before merging.
