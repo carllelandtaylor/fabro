@@ -1,0 +1,11 @@
+I'll check what processes and ports are actually active before attempting to stop anything.Checked the full process list, listening ports, and the harness's background-task tracker.
+
+**Findings:**
+- No `python3 -m http.server` process is running (or ever was — every design-review sub-stage in this run independently confirmed no `design-mock.html` was ever found or created, so no mock server was ever started).
+- No browser/chromium/puppeteer/playwright process is running.
+- No TCP ports are in `LISTEN` state anywhere on this host (checked `/proc/net/tcp` directly since `ss`/`lsof`/`netstat` aren't installed) — nothing is holding a port.
+- No background tasks are tracked by the harness for this session.
+
+**Nothing to stop:** the design-mock browser/server pipeline never launched anything, since the branch was a CLI-only fix with no rendered UI surface — there was no port, process, or session to close.
+
+**Unrelated, not touched:** there are several `fabro server` processes bound to Unix domain sockets (`/tmp/.tmp*/fabro.sock`, `configured.sock`, `explicit.sock`) plus many defunct/zombie `fabro`/`cargo` processes — these are test-fixture artifacts from the `cargo nextest run` invocations earlier in this pipeline, not anything from the design-mock/browser flow, and they don't hold any TCP port. I left them alone since they're out of scope for this request and stopping them isn't what was asked. No code or design changes were made in this stage.
