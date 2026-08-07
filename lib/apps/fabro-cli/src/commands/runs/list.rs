@@ -247,7 +247,7 @@ mod tests {
             },
             RunStatus::Dead,
         ] {
-            let rendered = render_cell(status_cell(status, true), true);
+            let rendered = render_cell(status_cell(status, true));
             assert!(
                 rendered.contains("\x1b[2m"),
                 "expected dim SGR for {status:?}, got: {rendered:?}"
@@ -291,7 +291,7 @@ mod tests {
             (RunStatus::Paused { prior_block: None }, "\x1b[35m"),
         ];
         for (status, expected_fg) in cases {
-            let rendered = render_cell(status_cell(status, true), true);
+            let rendered = render_cell(status_cell(status, true));
             assert!(
                 rendered.contains("\x1b[1m"),
                 "expected bold SGR for {status:?}, got: {rendered:?}"
@@ -309,10 +309,14 @@ mod tests {
 
     #[test]
     fn status_cell_emits_no_escapes_when_color_disabled() {
-        let rendered = render_cell(status_cell(RunStatus::Dead, false), true);
-        assert!(
-            !has_style_escape(&rendered),
-            "expected no style SGR when status_cell is built with use_color=false, got: {rendered:?}"
-        );
+        for status in [RunStatus::Dead, RunStatus::Succeeded {
+            reason: SuccessReason::Completed,
+        }] {
+            let rendered = render_cell(status_cell(status, false));
+            assert!(
+                !has_style_escape(&rendered),
+                "expected no style SGR when status_cell is built with use_color=false for {status:?}, got: {rendered:?}"
+            );
+        }
     }
 }

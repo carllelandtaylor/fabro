@@ -1,15 +1,15 @@
 ---
 title: "fix: dim CLI table cells instead of hardcoding Ansi256(8)"
 type: fix
-status: active
+status: completed
 date: 2026-08-06
 ---
 
 # fix: dim CLI table cells instead of hardcoding Ansi256(8)
 
-Based on `.facto/bug-brief.md` (root cause, verified code locations, logged
-reproduction steps) and `.facto/brief.md` (fix planning brief), plus the
-decisions recorded in `plan_fix.record_decisions`. Created 2026-08-06.
+Based on the bug report's root cause analysis (verified code locations,
+logged reproduction steps) and the fix planning brief, plus the decisions
+recorded in `plan_fix.record_decisions`. Created 2026-08-06.
 
 ## Overview
 
@@ -25,12 +25,13 @@ This plan replaces all ten sites with `.dimmed(use_color)`, restructures
 bold-suppression sentinel, and adds regression tests that assert on the
 actual emitted ANSI/SGR bytes.
 
-## Root Cause (from `.facto/bug-brief.md`)
+## Root Cause
 
 - `lib/apps/fabro-cli/src/commands/runs/list.rs` — `list_command` (lines 128,
   138, 148) and `status_cell` (lines 171–186, the most severe case: status is
-  conveyed only by color for `Submitted | Pending | Dead`, and `Ansi256(8)`
-  doubles as a bold-suppression sentinel there).
+  conveyed only by the presence/absence of bold and color together for
+  `Submitted | Pending | Dead`, and `Ansi256(8)` doubles as a
+  bold-suppression sentinel there).
 - `lib/apps/fabro-cli/src/commands/model.rs` — `model_row` (lines 135, 138).
 - `lib/apps/fabro-cli/src/commands/workflow/list.rs` — `print_section` (line
   113).

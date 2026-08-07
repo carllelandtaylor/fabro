@@ -158,23 +158,37 @@ mod tests {
     }
 
     #[test]
+    fn name_cell_has_cyan_color() {
+        let workflow = test_workflow("goal text");
+        let name_cell = render_row(vec![
+            workflow_row(&workflow, true).into_iter().next().unwrap(),
+        ]);
+        assert!(
+            name_cell.contains("\x1b[36m"),
+            "expected NAME cell to carry Cyan SGR, got: {name_cell:?}"
+        );
+    }
+
+    #[test]
     fn goal_cell_dims_instead_of_ansi256() {
         let workflow = test_workflow("goal text");
-        let rendered = render_row(workflow_row(&workflow, true), true);
+        let description_cell = render_row(vec![
+            workflow_row(&workflow, true).into_iter().nth(1).unwrap(),
+        ]);
         assert!(
-            rendered.contains("\x1b[2m"),
-            "expected dim SGR, got: {rendered:?}"
+            description_cell.contains("\x1b[2m"),
+            "expected DESCRIPTION cell to carry dim SGR, got: {description_cell:?}"
         );
         assert!(
-            !rendered.contains("\x1b[38;5;8m"),
-            "expected no Ansi256(8) SGR, got: {rendered:?}"
+            !description_cell.contains("\x1b[38;5;8m"),
+            "expected no Ansi256(8) SGR on DESCRIPTION cell, got: {description_cell:?}"
         );
     }
 
     #[test]
     fn goal_cell_no_color_has_no_escape_bytes() {
         let workflow = test_workflow("goal text");
-        let rendered = render_row(workflow_row(&workflow, false), true);
+        let rendered = render_row(workflow_row(&workflow, false));
         assert!(
             !has_style_escape(&rendered),
             "expected no style SGR when workflow_row is built with use_color=false, got: {rendered:?}"

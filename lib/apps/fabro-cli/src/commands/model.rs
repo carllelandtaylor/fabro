@@ -654,10 +654,20 @@ mod tests {
         let model: Model =
             serde_json::from_value(test_model_json("test-model", ProviderId::anthropic())).unwrap();
 
-        let provider_cell = render_row(
-            vec![model_row(&model, true).into_iter().nth(1).unwrap()],
-            true,
-        );
+        // Columns: MODEL, PROVIDER, ALIASES, CONTEXT, COST, SPEED.
+        let row = model_row(&model, true);
+        let [
+            _model_cell,
+            provider_cell,
+            aliases_cell,
+            _context_cell,
+            _cost_cell,
+            speed_cell,
+        ]: [_; 6] = row
+            .try_into()
+            .unwrap_or_else(|_| panic!("expected 6 columns"));
+
+        let provider_cell = render_row(vec![provider_cell]);
         assert!(
             provider_cell.contains("\x1b[2m"),
             "expected PROVIDER cell to carry dim SGR, got: {provider_cell:?}"
@@ -667,10 +677,7 @@ mod tests {
             "expected no Ansi256(8) SGR on PROVIDER cell, got: {provider_cell:?}"
         );
 
-        let aliases_cell = render_row(
-            vec![model_row(&model, true).into_iter().nth(2).unwrap()],
-            true,
-        );
+        let aliases_cell = render_row(vec![aliases_cell]);
         assert!(
             aliases_cell.contains("\x1b[2m"),
             "expected ALIASES cell to carry dim SGR, got: {aliases_cell:?}"
@@ -679,13 +686,19 @@ mod tests {
             !aliases_cell.contains("\x1b[38;5;8m"),
             "expected no Ansi256(8) SGR on ALIASES cell, got: {aliases_cell:?}"
         );
+
+        let speed_cell = render_row(vec![speed_cell]);
+        assert!(
+            speed_cell.contains("\x1b[36m"),
+            "expected SPEED cell to carry Cyan SGR, got: {speed_cell:?}"
+        );
     }
 
     #[test]
     fn model_row_no_color_has_no_escape_bytes() {
         let model: Model =
             serde_json::from_value(test_model_json("test-model", ProviderId::anthropic())).unwrap();
-        let rendered = render_row(model_row(&model, false), true);
+        let rendered = render_row(model_row(&model, false));
         assert!(
             !has_style_escape(&rendered),
             "expected no style SGR when model_row is built with use_color=false, got: {rendered:?}"

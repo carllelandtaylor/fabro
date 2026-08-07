@@ -132,21 +132,33 @@ mod tests {
     }
 
     #[test]
-    fn detail_cell_dims_instead_of_ansi256() {
-        let rendered = render_row(timeline_row(&test_entry(), true), true);
+    fn timeline_row_ordinal_cyan_and_detail_dims_instead_of_ansi256() {
+        // Columns: @, Node, Details.
+        let row = timeline_row(&test_entry(), true);
+        let [ordinal_cell, _node_cell, detail_cell]: [_; 3] = row
+            .try_into()
+            .unwrap_or_else(|_| panic!("expected 3 columns"));
+
+        let ordinal_cell = render_row(vec![ordinal_cell]);
         assert!(
-            rendered.contains("\x1b[2m"),
-            "expected dim SGR, got: {rendered:?}"
+            ordinal_cell.contains("\x1b[36m"),
+            "expected ordinal cell to carry Cyan SGR, got: {ordinal_cell:?}"
+        );
+
+        let detail_cell = render_row(vec![detail_cell]);
+        assert!(
+            detail_cell.contains("\x1b[2m"),
+            "expected DETAILS cell to carry dim SGR, got: {detail_cell:?}"
         );
         assert!(
-            !rendered.contains("\x1b[38;5;8m"),
-            "expected no Ansi256(8) SGR, got: {rendered:?}"
+            !detail_cell.contains("\x1b[38;5;8m"),
+            "expected no Ansi256(8) SGR on DETAILS cell, got: {detail_cell:?}"
         );
     }
 
     #[test]
     fn detail_cell_no_color_has_no_escape_bytes() {
-        let rendered = render_row(timeline_row(&test_entry(), false), true);
+        let rendered = render_row(timeline_row(&test_entry(), false));
         assert!(
             !has_style_escape(&rendered),
             "expected no style SGR when timeline_row is built with use_color=false, got: {rendered:?}"
