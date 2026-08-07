@@ -206,6 +206,7 @@ mod tests {
     use fabro_types::status::{BlockedReason, FailureReason, PendingReason, SuccessReason};
 
     use super::*;
+    use crate::commands::test_support::{has_style_escape, render_cell};
 
     #[test]
     fn truncate_goal_strips_markdown_headings() {
@@ -237,20 +238,6 @@ mod tests {
         );
     }
 
-    fn render_cell(cell: CellStruct, use_color: bool) -> String {
-        let color_choice = if use_color {
-            cli_table::ColorChoice::Always
-        } else {
-            cli_table::ColorChoice::Never
-        };
-        vec![vec![cell]]
-            .table()
-            .color_choice(color_choice)
-            .display()
-            .unwrap()
-            .to_string()
-    }
-
     #[test]
     fn status_cell_dims_submitted_pending_dead_instead_of_ansi256() {
         for status in [
@@ -268,6 +255,10 @@ mod tests {
             assert!(
                 !rendered.contains("\x1b[38;5;8m"),
                 "expected no Ansi256(8) SGR for {status:?}, got: {rendered:?}"
+            );
+            assert!(
+                !rendered.contains("\x1b[1m"),
+                "expected bold to be suppressed for dim status {status:?}, got: {rendered:?}"
             );
         }
     }
@@ -288,12 +279,15 @@ mod tests {
                 "\x1b[31m",
             ),
             (RunStatus::Running, "\x1b[36m"),
+            (RunStatus::Starting, "\x1b[36m"),
+            (RunStatus::Runnable, "\x1b[36m"),
             (
                 RunStatus::Blocked {
                     blocked_reason: BlockedReason::HumanInputRequired,
                 },
                 "\x1b[33m",
             ),
+            (RunStatus::Removing, "\x1b[33m"),
             (RunStatus::Paused { prior_block: None }, "\x1b[35m"),
         ];
         for (status, expected_fg) in cases {
@@ -315,10 +309,10 @@ mod tests {
 
     #[test]
     fn status_cell_emits_no_escapes_when_color_disabled() {
-        let rendered = render_cell(status_cell(RunStatus::Dead, false), false);
+        let rendered = render_cell(status_cell(RunStatus::Dead, false), true);
         assert!(
-            !rendered.contains("\x1b["),
-            "expected no ANSI escapes with use_color=false, got: {rendered:?}"
+            !has_style_escape(&rendered),
+            "expected no style SGR when status_cell is built with use_color=false, got: {rendered:?}"
         );
     }
 }

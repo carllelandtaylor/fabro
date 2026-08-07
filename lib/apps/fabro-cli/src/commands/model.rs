@@ -516,6 +516,7 @@ mod tests {
     };
 
     use super::*;
+    use crate::commands::test_support::{has_style_escape, render_row};
 
     fn test_client(api_url: &str) -> server_client::Client {
         server_client::Client::new_no_proxy(api_url).unwrap()
@@ -648,32 +649,35 @@ mod tests {
         assert_eq!(format_speed(Some(85.5)), "85 tok/s");
     }
 
-    fn render_row(row: Vec<CellStruct>, use_color: bool) -> String {
-        let cc = if use_color {
-            cli_table::ColorChoice::Always
-        } else {
-            cli_table::ColorChoice::Never
-        };
-        vec![row]
-            .table()
-            .color_choice(cc)
-            .display()
-            .unwrap()
-            .to_string()
-    }
-
     #[test]
     fn model_row_dims_provider_and_aliases_instead_of_ansi256() {
         let model: Model =
             serde_json::from_value(test_model_json("test-model", ProviderId::anthropic())).unwrap();
-        let rendered = render_row(model_row(&model, true), true);
-        assert!(
-            rendered.contains("\x1b[2m"),
-            "expected dim SGR, got: {rendered:?}"
+
+        let provider_cell = render_row(
+            vec![model_row(&model, true).into_iter().nth(1).unwrap()],
+            true,
         );
         assert!(
-            !rendered.contains("\x1b[38;5;8m"),
-            "expected no Ansi256(8) SGR, got: {rendered:?}"
+            provider_cell.contains("\x1b[2m"),
+            "expected PROVIDER cell to carry dim SGR, got: {provider_cell:?}"
+        );
+        assert!(
+            !provider_cell.contains("\x1b[38;5;8m"),
+            "expected no Ansi256(8) SGR on PROVIDER cell, got: {provider_cell:?}"
+        );
+
+        let aliases_cell = render_row(
+            vec![model_row(&model, true).into_iter().nth(2).unwrap()],
+            true,
+        );
+        assert!(
+            aliases_cell.contains("\x1b[2m"),
+            "expected ALIASES cell to carry dim SGR, got: {aliases_cell:?}"
+        );
+        assert!(
+            !aliases_cell.contains("\x1b[38;5;8m"),
+            "expected no Ansi256(8) SGR on ALIASES cell, got: {aliases_cell:?}"
         );
     }
 
@@ -681,10 +685,10 @@ mod tests {
     fn model_row_no_color_has_no_escape_bytes() {
         let model: Model =
             serde_json::from_value(test_model_json("test-model", ProviderId::anthropic())).unwrap();
-        let rendered = render_row(model_row(&model, false), false);
+        let rendered = render_row(model_row(&model, false), true);
         assert!(
-            !rendered.contains("\x1b["),
-            "expected no ANSI escape bytes, got: {rendered:?}"
+            !has_style_escape(&rendered),
+            "expected no style SGR when model_row is built with use_color=false, got: {rendered:?}"
         );
     }
 

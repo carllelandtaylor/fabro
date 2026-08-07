@@ -52,6 +52,31 @@ pub(crate) fn short_id(run_id: &str) -> &str {
     &run_id[..8.min(run_id.len())]
 }
 
+fn timeline_row(entry: &TimelineEntryJson, use_color: bool) -> Vec<CellStruct> {
+    let ordinal_str = format!("@{}", entry.ordinal);
+    let mut details = Vec::new();
+    if entry.visit > 1 {
+        details.push(format!("visit {}, loop", entry.visit));
+    }
+    if entry.run_commit_sha.is_none() {
+        details.push("no run commit".to_string());
+    }
+
+    let detail_str = if details.is_empty() {
+        String::new()
+    } else {
+        format!("({})", details.join(", "))
+    };
+
+    vec![
+        ordinal_str
+            .cell()
+            .foreground_color(color_if(use_color, Color::Cyan)),
+        entry.node_name.clone().cell(),
+        detail_str.cell().dimmed(use_color),
+    ]
+}
+
 pub(crate) fn print_timeline(entries: &[TimelineEntryJson], styles: &Styles, printer: Printer) {
     if entries.is_empty() {
         fabro_util::printerr!(printer, "No checkpoints found.");
@@ -67,30 +92,7 @@ pub(crate) fn print_timeline(entries: &[TimelineEntryJson], styles: &Styles, pri
 
     let rows: Vec<Vec<CellStruct>> = entries
         .iter()
-        .map(|entry| {
-            let ordinal_str = format!("@{}", entry.ordinal);
-            let mut details = Vec::new();
-            if entry.visit > 1 {
-                details.push(format!("visit {}, loop", entry.visit));
-            }
-            if entry.run_commit_sha.is_none() {
-                details.push("no run commit".to_string());
-            }
-
-            let detail_str = if details.is_empty() {
-                String::new()
-            } else {
-                format!("({})", details.join(", "))
-            };
-
-            vec![
-                ordinal_str
-                    .cell()
-                    .foreground_color(color_if(use_color, Color::Cyan)),
-                entry.node_name.clone().cell(),
-                detail_str.cell().dimmed(use_color),
-            ]
-        })
+        .map(|entry| timeline_row(entry, use_color))
         .collect();
 
     let color_choice = if use_color {
@@ -118,24 +120,20 @@ pub(crate) fn print_timeline(entries: &[TimelineEntryJson], styles: &Styles, pri
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::test_support::{has_style_escape, render_row};
 
-    fn render_cell(cell: CellStruct, use_color: bool) -> String {
-        let color_choice = if use_color {
-            cli_table::ColorChoice::Always
-        } else {
-            cli_table::ColorChoice::Never
-        };
-        vec![vec![cell]]
-            .table()
-            .color_choice(color_choice)
-            .display()
-            .unwrap()
-            .to_string()
+    fn test_entry() -> TimelineEntryJson {
+        TimelineEntryJson {
+            ordinal:        2,
+            node_name:      "some_node".to_string(),
+            visit:          2,
+            run_commit_sha: None,
+        }
     }
 
     #[test]
     fn detail_cell_dims_instead_of_ansi256() {
-        let rendered = render_cell("(visit 2, loop)".cell().dimmed(true), true);
+        let rendered = render_row(timeline_row(&test_entry(), true), true);
         assert!(
             rendered.contains("\x1b[2m"),
             "expected dim SGR, got: {rendered:?}"
@@ -148,10 +146,10 @@ mod tests {
 
     #[test]
     fn detail_cell_no_color_has_no_escape_bytes() {
-        let rendered = render_cell("(visit 2, loop)".cell().dimmed(false), false);
+        let rendered = render_row(timeline_row(&test_entry(), false), true);
         assert!(
-            !rendered.contains("\x1b["),
-            "expected no ANSI escape bytes, got: {rendered:?}"
+            !has_style_escape(&rendered),
+            "expected no style SGR when timeline_row is built with use_color=false, got: {rendered:?}"
         );
     }
 }

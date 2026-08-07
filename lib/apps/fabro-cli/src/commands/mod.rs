@@ -22,6 +22,8 @@ pub(crate) mod sandbox;
 pub(crate) mod secret;
 pub(crate) mod server;
 pub(crate) mod system;
+#[cfg(test)]
+pub(crate) mod test_support;
 pub(crate) mod uninstall;
 pub(crate) mod upgrade;
 pub(crate) mod validate;

@@ -97,20 +97,7 @@ fn print_section(
 
     let rows: Vec<Vec<CellStruct>> = workflows
         .iter()
-        .map(|w| {
-            let goal_str = w
-                .goal
-                .as_deref()
-                .map(|g| truncate_str(g, GOAL_MAX_LEN))
-                .unwrap_or_default();
-            vec![
-                w.name
-                    .clone()
-                    .cell()
-                    .foreground_color(color_if(use_color, Color::Cyan)),
-                goal_str.cell().dimmed(use_color),
-            ]
-        })
+        .map(|w| workflow_row(w, use_color))
         .collect();
 
     let color_choice = if use_color {
@@ -133,6 +120,21 @@ fn print_section(
     );
 }
 
+fn workflow_row(w: &WorkflowInfo, use_color: bool) -> Vec<CellStruct> {
+    let goal_str = w
+        .goal
+        .as_deref()
+        .map(|g| truncate_str(g, GOAL_MAX_LEN))
+        .unwrap_or_default();
+    vec![
+        w.name
+            .clone()
+            .cell()
+            .foreground_color(color_if(use_color, Color::Cyan)),
+        goal_str.cell().dimmed(use_color),
+    ]
+}
+
 fn truncate_str(s: &str, max: usize) -> String {
     let first_line = s.lines().next().unwrap_or(s);
     if first_line.len() <= max {
@@ -145,24 +147,20 @@ fn truncate_str(s: &str, max: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::test_support::{has_style_escape, render_row};
 
-    fn render_cell(cell: CellStruct, use_color: bool) -> String {
-        let color_choice = if use_color {
-            cli_table::ColorChoice::Always
-        } else {
-            cli_table::ColorChoice::Never
-        };
-        vec![vec![cell]]
-            .table()
-            .color_choice(color_choice)
-            .display()
-            .unwrap()
-            .to_string()
+    fn test_workflow(goal: &str) -> WorkflowInfo {
+        WorkflowInfo {
+            name:   "wf".to_string(),
+            goal:   Some(goal.to_string()),
+            source: WorkflowSource::Project,
+        }
     }
 
     #[test]
     fn goal_cell_dims_instead_of_ansi256() {
-        let rendered = render_cell("goal text".cell().dimmed(true), true);
+        let workflow = test_workflow("goal text");
+        let rendered = render_row(workflow_row(&workflow, true), true);
         assert!(
             rendered.contains("\x1b[2m"),
             "expected dim SGR, got: {rendered:?}"
@@ -175,10 +173,11 @@ mod tests {
 
     #[test]
     fn goal_cell_no_color_has_no_escape_bytes() {
-        let rendered = render_cell("goal text".cell().dimmed(false), false);
+        let workflow = test_workflow("goal text");
+        let rendered = render_row(workflow_row(&workflow, false), true);
         assert!(
-            !rendered.contains("\x1b["),
-            "expected no ANSI escape bytes, got: {rendered:?}"
+            !has_style_escape(&rendered),
+            "expected no style SGR when workflow_row is built with use_color=false, got: {rendered:?}"
         );
     }
 }
