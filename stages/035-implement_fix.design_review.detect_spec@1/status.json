@@ -1,0 +1,6 @@
+{
+  "outcome": "failed",
+  "notes": null,
+  "failure_reason": "Script failed with exit code: 1\n\n## output\ntask_dir=unresolved\nbase_ref=0abf2297c00a90013a93ae01c6c139b7b85b1b1f\n--- files changed on this branch ---\n.facto/brief.md\n.facto/bug-brief.md\n.facto/result.md\ndocs/plans/2026-08-06-fix-text-color-plan.md\nlib/apps/fabro-cli/src/commands/runs/list.rs\nlib/apps/fabro-cli/src/commands/workflow/list.rs\nNO_MOCK: no design-mock.html found in the task directory and none passed by the caller; run the sanity-check path\n",
+  "timestamp": "2026-08-07T00:29:38.018224659Z"
+}
