@@ -139,11 +139,11 @@ first.
       proving the `NO_COLOR`/non-tty gate still works.
 
 **Validation:**
-- [ ] `cargo build -p fabro-cli`
-- [ ] `cargo nextest run -p fabro-cli -- status_cell` — new tests pass
-- [ ] `rg -n "Ansi256\(8\)" lib/apps/fabro-cli/src/commands/runs/list.rs` — no matches
-- [ ] `cargo +nightly-2026-04-14 fmt --check --all`
-- [ ] `cargo +nightly-2026-04-14 clippy -p fabro-cli --all-targets -- -D warnings`
+- [x] `cargo build -p fabro-cli`
+- [x] `cargo nextest run -p fabro-cli -- status_cell` — new tests pass
+- [x] `rg -n "Ansi256\(8\)" lib/apps/fabro-cli/src/commands/runs/list.rs` — no matches
+- [x] `cargo +nightly-2026-04-14 fmt --check --all`
+- [x] `cargo +nightly-2026-04-14 clippy -p fabro-cli --all-targets -- -D warnings`
 
 **Commit message:**
 ```
@@ -187,12 +187,12 @@ above it in the same function for the section header.
     - A test with `use_color = false` asserting no `"\x1b["` escape appears.
 
 **Validation:**
-- [ ] `cargo build -p fabro-cli`
-- [ ] `cargo nextest run -p fabro-cli -- workflow::list` — new tests pass
-- [ ] `rg -n "Ansi256\(8\)" lib/apps/fabro-cli/src/commands/workflow/list.rs` — no matches
-- [ ] `cargo +nightly-2026-04-14 fmt --check --all`
-- [ ] `cargo +nightly-2026-04-14 clippy -p fabro-cli --all-targets -- -D warnings`
-- [ ] Re-run the logged repro: `TERM=xterm-256color CLICOLOR_FORCE=1 ./target/debug/fabro workflow list 2>&1 | cat -v` shows `\x1b[2m` on the DESCRIPTION cell, not `\x1b[38;5;8m`
+- [x] `cargo build -p fabro-cli`
+- [x] `cargo nextest run -p fabro-cli -- workflow::list` — new tests pass
+- [x] `rg -n "Ansi256\(8\)" lib/apps/fabro-cli/src/commands/workflow/list.rs` — no matches
+- [x] `cargo +nightly-2026-04-14 fmt --check --all`
+- [x] `cargo +nightly-2026-04-14 clippy -p fabro-cli --all-targets -- -D warnings`
+- [x] Re-run the logged repro: `TERM=xterm-256color CLICOLOR_FORCE=1 ./target/debug/fabro workflow list 2>&1 | cat -v` shows `\x1b[2m` on the DESCRIPTION cell, not `\x1b[38;5;8m`
 
 **Commit message:**
 ```
@@ -231,11 +231,11 @@ Manual:
     `use_color = false` test asserting no escape bytes appear.
 
 **Validation:**
-- [ ] `cargo build -p fabro-cli`
-- [ ] `cargo nextest run -p fabro-cli -- run::checkpoints` — new tests pass
-- [ ] `rg -n "Ansi256\(8\)" lib/apps/fabro-cli/src/commands/run/checkpoints.rs` — no matches
-- [ ] `cargo +nightly-2026-04-14 fmt --check --all`
-- [ ] `cargo +nightly-2026-04-14 clippy -p fabro-cli --all-targets -- -D warnings`
+- [x] `cargo build -p fabro-cli`
+- [x] `cargo nextest run -p fabro-cli -- run::checkpoints` — new tests pass
+- [x] `rg -n "Ansi256\(8\)" lib/apps/fabro-cli/src/commands/run/checkpoints.rs` — no matches
+- [x] `cargo +nightly-2026-04-14 fmt --check --all`
+- [x] `cargo +nightly-2026-04-14 clippy -p fabro-cli --all-targets -- -D warnings`
 
 **Commit message:**
 ```
@@ -283,12 +283,12 @@ confirms the workspace-wide invariant: no `Color::Ansi256(8)` remains in
     - A `use_color = false` variant asserting no `"\x1b["` escape appears.
 
 **Validation:**
-- [ ] `cargo build -p fabro-cli`
-- [ ] `cargo nextest run -p fabro-cli -- model::tests` — new tests pass
-- [ ] `rg -n "Ansi256\(8\)" lib/apps/fabro-cli/src` — **no matches anywhere** (confirms the workspace-wide fix is complete)
-- [ ] `cargo +nightly-2026-04-14 fmt --check --all`
-- [ ] `cargo +nightly-2026-04-14 clippy -p fabro-cli --all-targets -- -D warnings`
-- [ ] Re-run the logged repro end-to-end one final time (see Test Plan)
+- [x] `cargo build -p fabro-cli`
+- [x] `cargo nextest run -p fabro-cli -- model::tests` — new tests pass
+- [x] `rg -n "Ansi256\(8\)" lib/apps/fabro-cli/src` — **no matches anywhere** (confirms the workspace-wide fix is complete)
+- [x] `cargo +nightly-2026-04-14 fmt --check --all`
+- [x] `cargo +nightly-2026-04-14 clippy -p fabro-cli --all-targets -- -D warnings`
+- [x] Re-run the logged repro end-to-end one final time (see Test Plan)
 
 **Commit message:**
 ```
@@ -341,25 +341,35 @@ Manual:
 
 ## Test Plan
 
-- [ ] `cargo build --workspace`
-- [ ] `cargo nextest run -p fabro-cli`
-- [ ] `cargo nextest run --workspace` (confirm no unrelated regressions)
-- [ ] `cargo +nightly-2026-04-14 fmt --check --all`
-- [ ] `cargo +nightly-2026-04-14 clippy --workspace --all-targets -- -D warnings`
-- [ ] `rg -n "Ansi256\(8\)" lib/apps/fabro-cli/src` returns no matches
+- [x] `cargo build --workspace`
+- [x] `cargo nextest run -p fabro-cli`
+- [x] `cargo nextest run --workspace` (confirm no unrelated regressions)
+- [x] `cargo +nightly-2026-04-14 fmt --check --all`
+- [x] `cargo +nightly-2026-04-14 clippy --workspace --all-targets -- -D warnings`
+- [x] `rg -n "Ansi256\(8\)" lib/apps/fabro-cli/src` returns no matches
 - [ ] `cargo insta pending-snapshots` — confirm empty, or review before `cargo insta accept` if any CLI snapshot output changed
-- [ ] Manual: `cargo build -p fabro-cli`, then
+      — **not run**: `cargo-insta` is not installed in this sandbox; no CLI
+      snapshot fixtures changed in this diff, so risk is low, but this check
+      is still outstanding
+- [x] Manual: `cargo build -p fabro-cli`, then
       `TERM=xterm-256color CLICOLOR_FORCE=1 ./target/debug/fabro workflow list 2>&1 | cat -v`
       — confirm `\x1b[38;5;8m` is gone and `\x1b[2m` appears on the
       DESCRIPTION cell (re-runs the exact logged repro from
       `.facto/bug-brief.md`)
 - [ ] Manual: same env vars, `./target/debug/fabro model list 2>&1 | cat -v`
       — confirm PROVIDER/ALIASES emit `\x1b[2m`, SPEED keeps Cyan
+      — **not run**: `fabro model list` requires a running Fabro server,
+      unavailable in this sandbox; covered instead by
+      `model_row_dims_provider_and_aliases_instead_of_ansi256`
 - [ ] Manual, real terminal (not the sandbox): open a dark-background
       terminal, run `fabro workflow list` and `fabro model list` with no
       env overrides, and visually confirm the secondary text is legible
       (dim, not invisible)
+      — **not run**: no real terminal/human available in this sandboxed
+      agent environment; see Risk 1
 - [ ] Manual, if a server is available: `fabro ps` and
       `fabro run checkpoints <run-id>` — confirm status/detail columns are
       legible and status colors (Succeeded=green, Failed=red, etc.) are
       unchanged
+      — **not run**: no live server available in this sandbox; see Risks 2
+      and 3

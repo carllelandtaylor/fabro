@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use anyhow::Result;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use cli_table::format::{Border, Separator};
 use cli_table::{Cell, CellStruct, Color, Style, Table};
 use fabro_util::terminal::Styles;
@@ -12,7 +12,7 @@ use super::short_run_id;
 use crate::args::RunsListArgs;
 use crate::command_context::CommandContext;
 use crate::commands::resolve_run_id;
-use crate::server_runs::{ServerRunLookup, filter_server_runs};
+use crate::server_runs::{ServerRunInfo, ServerRunLookup, filter_server_runs};
 use crate::shared::{color_if, format_duration_ms, run_status_kind, tilde_path};
 
 pub(crate) async fn list_command(
@@ -106,39 +106,7 @@ pub(crate) async fn list_command(
 
     let rows: Vec<Vec<CellStruct>> = display_runs
         .iter()
-        .map(|run| {
-            let duration_display = match run.wall_time_ms() {
-                Some(ms) => format_duration_ms(ms),
-                None => match run.start_time_dt() {
-                    Some(start) => {
-                        let elapsed = now.signed_duration_since(start);
-                        format_duration_ms(elapsed.num_milliseconds().max(0).cast_unsigned())
-                    }
-                    None => "-".to_string(),
-                },
-            };
-            let dir_display = run
-                .source_directory()
-                .map_or_else(|| "-".to_string(), |p| tilde_path(Path::new(p)));
-            let run_id = run.run_id().to_string();
-
-            let mut row = vec![short_run_id(&run_id).cell().dimmed(use_color)];
-            if show_parent_column {
-                let parent_display = run.parent_id().map_or_else(
-                    || "-".to_string(),
-                    |parent_id| short_run_id(&parent_id.to_string()).to_string(),
-                );
-                row.push(parent_display.cell().dimmed(use_color));
-            }
-            row.extend([
-                run.workflow_display_name().cell(),
-                status_cell(run.status(), use_color),
-                dir_display.cell(),
-                duration_display.cell(),
-                truncate_goal(&run.goal(), 50).cell().dimmed(use_color),
-            ]);
-            row
-        })
+        .map(|run| run_row(run, show_parent_column, now, use_color))
         .collect();
 
     let color_choice = if use_color {
@@ -156,6 +124,45 @@ pub(crate) async fn list_command(
 
     fabro_util::printerr!(printer, "\n{} run(s) listed.", display_runs.len());
     Ok(())
+}
+
+fn run_row(
+    run: &ServerRunInfo,
+    show_parent_column: bool,
+    now: DateTime<Utc>,
+    use_color: bool,
+) -> Vec<CellStruct> {
+    let duration_display = match run.wall_time_ms() {
+        Some(ms) => format_duration_ms(ms),
+        None => match run.start_time_dt() {
+            Some(start) => {
+                let elapsed = now.signed_duration_since(start);
+                format_duration_ms(elapsed.num_milliseconds().max(0).cast_unsigned())
+            }
+            None => "-".to_string(),
+        },
+    };
+    let dir_display = run
+        .source_directory()
+        .map_or_else(|| "-".to_string(), |p| tilde_path(Path::new(p)));
+    let run_id = run.run_id().to_string();
+
+    let mut row = vec![short_run_id(&run_id).cell().dimmed(use_color)];
+    if show_parent_column {
+        let parent_display = run.parent_id().map_or_else(
+            || "-".to_string(),
+            |parent_id| short_run_id(&parent_id.to_string()).to_string(),
+        );
+        row.push(parent_display.cell().dimmed(use_color));
+    }
+    row.extend([
+        run.workflow_display_name().cell(),
+        status_cell(run.status(), use_color),
+        dir_display.cell(),
+        duration_display.cell(),
+        truncate_goal(&run.goal(), 50).cell().dimmed(use_color),
+    ]);
+    row
 }
 
 fn status_cell(status: RunStatus, use_color: bool) -> CellStruct {
@@ -203,10 +210,68 @@ fn truncate_str(s: &str, max_len: usize) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use fabro_types::status::{BlockedReason, FailureReason, PendingReason, SuccessReason};
+    use fabro_types::test_support::test_principal;
+    use fabro_types::{
+        AskFabro, Run, RunId, RunLifecycle, RunLinks, RunOrigin, RunSize, RunTimestamps,
+        WorkflowRef,
+    };
 
     use super::*;
-    use crate::commands::test_support::{has_style_escape, render_cell};
+    use crate::commands::test_support::{has_style_escape, render_cell, render_row};
+    use crate::server_runs::ServerRunInfo;
+
+    fn test_run(run_id: RunId, parent_id: Option<RunId>, goal: &str) -> ServerRunInfo {
+        ServerRunInfo::from_run(Run {
+            id: run_id,
+            parent_id,
+            children_count: 0,
+            title: "test run".to_string(),
+            goal: goal.to_string(),
+            workflow: WorkflowRef {
+                slug:       None,
+                name:       Some("test-workflow".to_string()),
+                graph_name: None,
+                node_count: 0,
+                edge_count: 0,
+            },
+            automation: None,
+            repository: None,
+            created_by: test_principal(),
+            origin: RunOrigin::default(),
+            labels: HashMap::new(),
+            lifecycle: RunLifecycle {
+                status:          RunStatus::Running,
+                approval:        None,
+                pending_control: None,
+                queue_position:  None,
+                error:           None,
+                archived:        false,
+                archived_at:     None,
+            },
+            sandbox: None,
+            models: Vec::new(),
+            source_directory: None,
+            timestamps: RunTimestamps {
+                created_at:    run_id.created_at(),
+                started_at:    None,
+                last_event_at: None,
+                completed_at:  None,
+            },
+            timing: None,
+            billing: None,
+            size: RunSize::default(),
+            ask_fabro: AskFabro::default(),
+            diff: None,
+            pull_request: None,
+            current_question: None,
+            superseded_by: None,
+            retried_from: None,
+            links: RunLinks { web: None },
+        })
+    }
 
     #[test]
     fn truncate_goal_strips_markdown_headings() {
@@ -318,5 +383,68 @@ mod tests {
                 "expected no style SGR when status_cell is built with use_color=false for {status:?}, got: {rendered:?}"
             );
         }
+    }
+
+    #[test]
+    fn run_row_dims_run_id_parent_and_goal_instead_of_ansi256() {
+        let parent_id = RunId::new();
+        let run_id = RunId::new();
+        let run = test_run(run_id, Some(parent_id), "fix the login bug");
+        let now = Utc::now();
+
+        let row = run_row(&run, true, now, true);
+        let [
+            run_id_cell,
+            parent_cell,
+            _workflow_cell,
+            _status_cell,
+            _dir_cell,
+            _duration_cell,
+            goal_cell,
+        ]: [_; 7] = row
+            .try_into()
+            .unwrap_or_else(|_| panic!("expected 7 columns when show_parent_column is true"));
+
+        let run_id_rendered = render_cell(run_id_cell);
+        assert!(
+            run_id_rendered.contains("\x1b[2m"),
+            "expected RUN ID cell to carry dim SGR, got: {run_id_rendered:?}"
+        );
+        assert!(
+            !run_id_rendered.contains("\x1b[38;5;8m"),
+            "expected no Ansi256(8) SGR on RUN ID cell, got: {run_id_rendered:?}"
+        );
+
+        let parent_rendered = render_cell(parent_cell);
+        assert!(
+            parent_rendered.contains("\x1b[2m"),
+            "expected PARENT cell to carry dim SGR, got: {parent_rendered:?}"
+        );
+        assert!(
+            !parent_rendered.contains("\x1b[38;5;8m"),
+            "expected no Ansi256(8) SGR on PARENT cell, got: {parent_rendered:?}"
+        );
+
+        let goal_rendered = render_cell(goal_cell);
+        assert!(
+            goal_rendered.contains("\x1b[2m"),
+            "expected GOAL cell to carry dim SGR, got: {goal_rendered:?}"
+        );
+        assert!(
+            !goal_rendered.contains("\x1b[38;5;8m"),
+            "expected no Ansi256(8) SGR on GOAL cell, got: {goal_rendered:?}"
+        );
+    }
+
+    #[test]
+    fn run_row_emits_no_escapes_when_color_disabled() {
+        let run = test_run(RunId::new(), Some(RunId::new()), "fix the login bug");
+        let now = Utc::now();
+
+        let rendered = render_row(run_row(&run, true, now, false));
+        assert!(
+            !has_style_escape(&rendered),
+            "expected no style SGR when run_row is built with use_color=false, got: {rendered:?}"
+        );
     }
 }

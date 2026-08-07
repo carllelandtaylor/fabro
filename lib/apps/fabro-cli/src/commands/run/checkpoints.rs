@@ -120,7 +120,7 @@ pub(crate) fn print_timeline(entries: &[TimelineEntryJson], styles: &Styles, pri
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::test_support::{has_style_escape, render_row};
+    use crate::commands::test_support::{has_style_escape, render_cell, render_row};
 
     fn test_entry() -> TimelineEntryJson {
         TimelineEntryJson {
@@ -139,13 +139,17 @@ mod tests {
             .try_into()
             .unwrap_or_else(|_| panic!("expected 3 columns"));
 
-        let ordinal_cell = render_row(vec![ordinal_cell]);
+        let ordinal_cell = render_cell(ordinal_cell);
         assert!(
             ordinal_cell.contains("\x1b[36m"),
             "expected ordinal cell to carry Cyan SGR, got: {ordinal_cell:?}"
         );
+        assert!(
+            !ordinal_cell.contains("\x1b[2m"),
+            "expected ordinal cell to not carry dim SGR, got: {ordinal_cell:?}"
+        );
 
-        let detail_cell = render_row(vec![detail_cell]);
+        let detail_cell = render_cell(detail_cell);
         assert!(
             detail_cell.contains("\x1b[2m"),
             "expected DETAILS cell to carry dim SGR, got: {detail_cell:?}"
@@ -153,6 +157,26 @@ mod tests {
         assert!(
             !detail_cell.contains("\x1b[38;5;8m"),
             "expected no Ansi256(8) SGR on DETAILS cell, got: {detail_cell:?}"
+        );
+    }
+
+    #[test]
+    fn detail_cell_handles_no_details() {
+        let entry = TimelineEntryJson {
+            ordinal:        1,
+            node_name:      "some_node".to_string(),
+            visit:          1,
+            run_commit_sha: Some("abc123".to_string()),
+        };
+        let row = timeline_row(&entry, true);
+        let [_ordinal_cell, _node_cell, detail_cell]: [_; 3] = row
+            .try_into()
+            .unwrap_or_else(|_| panic!("expected 3 columns"));
+
+        let detail_cell = render_cell(detail_cell);
+        assert!(
+            !detail_cell.contains("\x1b[38;5;8m"),
+            "expected no Ansi256(8) SGR on empty DETAILS cell, got: {detail_cell:?}"
         );
     }
 

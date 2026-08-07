@@ -147,7 +147,7 @@ fn truncate_str(s: &str, max: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::test_support::{has_style_escape, render_row};
+    use crate::commands::test_support::{has_style_escape, render_cell, render_row};
 
     fn test_workflow(goal: &str) -> WorkflowInfo {
         WorkflowInfo {
@@ -157,24 +157,33 @@ mod tests {
         }
     }
 
+    fn test_workflow_no_goal() -> WorkflowInfo {
+        WorkflowInfo {
+            name:   "wf".to_string(),
+            goal:   None,
+            source: WorkflowSource::Project,
+        }
+    }
+
     #[test]
     fn name_cell_has_cyan_color() {
         let workflow = test_workflow("goal text");
-        let name_cell = render_row(vec![
-            workflow_row(&workflow, true).into_iter().next().unwrap(),
-        ]);
+        let name_cell = render_cell(workflow_row(&workflow, true).into_iter().next().unwrap());
         assert!(
             name_cell.contains("\x1b[36m"),
             "expected NAME cell to carry Cyan SGR, got: {name_cell:?}"
+        );
+        assert!(
+            !name_cell.contains("\x1b[2m"),
+            "expected NAME cell not to carry dim SGR, got: {name_cell:?}"
         );
     }
 
     #[test]
     fn goal_cell_dims_instead_of_ansi256() {
         let workflow = test_workflow("goal text");
-        let description_cell = render_row(vec![
-            workflow_row(&workflow, true).into_iter().nth(1).unwrap(),
-        ]);
+        let description_cell =
+            render_cell(workflow_row(&workflow, true).into_iter().nth(1).unwrap());
         assert!(
             description_cell.contains("\x1b[2m"),
             "expected DESCRIPTION cell to carry dim SGR, got: {description_cell:?}"
@@ -192,6 +201,17 @@ mod tests {
         assert!(
             !has_style_escape(&rendered),
             "expected no style SGR when workflow_row is built with use_color=false, got: {rendered:?}"
+        );
+    }
+
+    #[test]
+    fn goal_cell_handles_missing_goal() {
+        let workflow = test_workflow_no_goal();
+        let description_cell =
+            render_cell(workflow_row(&workflow, true).into_iter().nth(1).unwrap());
+        assert!(
+            !description_cell.contains("\x1b[38;5;8m"),
+            "expected no Ansi256(8) SGR on empty DESCRIPTION cell, got: {description_cell:?}"
         );
     }
 }

@@ -516,7 +516,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::commands::test_support::{has_style_escape, render_row};
+    use crate::commands::test_support::{has_style_escape, render_cell, render_row};
 
     fn test_client(api_url: &str) -> server_client::Client {
         server_client::Client::new_no_proxy(api_url).unwrap()
@@ -657,7 +657,7 @@ mod tests {
         // Columns: MODEL, PROVIDER, ALIASES, CONTEXT, COST, SPEED.
         let row = model_row(&model, true);
         let [
-            _model_cell,
+            model_cell,
             provider_cell,
             aliases_cell,
             _context_cell,
@@ -667,7 +667,13 @@ mod tests {
             .try_into()
             .unwrap_or_else(|_| panic!("expected 6 columns"));
 
-        let provider_cell = render_row(vec![provider_cell]);
+        let model_cell = render_cell(model_cell);
+        assert!(
+            model_cell.contains("\x1b[1m"),
+            "expected MODEL cell to carry bold SGR, got: {model_cell:?}"
+        );
+
+        let provider_cell = render_cell(provider_cell);
         assert!(
             provider_cell.contains("\x1b[2m"),
             "expected PROVIDER cell to carry dim SGR, got: {provider_cell:?}"
@@ -677,7 +683,7 @@ mod tests {
             "expected no Ansi256(8) SGR on PROVIDER cell, got: {provider_cell:?}"
         );
 
-        let aliases_cell = render_row(vec![aliases_cell]);
+        let aliases_cell = render_cell(aliases_cell);
         assert!(
             aliases_cell.contains("\x1b[2m"),
             "expected ALIASES cell to carry dim SGR, got: {aliases_cell:?}"
@@ -687,10 +693,14 @@ mod tests {
             "expected no Ansi256(8) SGR on ALIASES cell, got: {aliases_cell:?}"
         );
 
-        let speed_cell = render_row(vec![speed_cell]);
+        let speed_cell = render_cell(speed_cell);
         assert!(
             speed_cell.contains("\x1b[36m"),
             "expected SPEED cell to carry Cyan SGR, got: {speed_cell:?}"
+        );
+        assert!(
+            !speed_cell.contains("\x1b[2m"),
+            "expected SPEED cell to not carry dim SGR, got: {speed_cell:?}"
         );
     }
 
