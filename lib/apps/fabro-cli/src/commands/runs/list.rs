@@ -203,6 +203,8 @@ fn truncate_str(s: &str, max_len: usize) -> String {
 
 #[cfg(test)]
 mod tests {
+    use fabro_types::status::{BlockedReason, FailureReason, PendingReason, SuccessReason};
+
     use super::*;
 
     #[test]
@@ -235,10 +237,15 @@ mod tests {
         );
     }
 
-    fn render_cell(cell: CellStruct) -> String {
+    fn render_cell(cell: CellStruct, use_color: bool) -> String {
+        let color_choice = if use_color {
+            cli_table::ColorChoice::Always
+        } else {
+            cli_table::ColorChoice::Never
+        };
         vec![vec![cell]]
             .table()
-            .color_choice(cli_table::ColorChoice::Always)
+            .color_choice(color_choice)
             .display()
             .unwrap()
             .to_string()
@@ -249,11 +256,11 @@ mod tests {
         for status in [
             RunStatus::Submitted,
             RunStatus::Pending {
-                reason: fabro_types::status::PendingReason::ApprovalRequired,
+                reason: PendingReason::ApprovalRequired,
             },
             RunStatus::Dead,
         ] {
-            let rendered = render_cell(status_cell(status, true));
+            let rendered = render_cell(status_cell(status, true), true);
             assert!(
                 rendered.contains("\x1b[2m"),
                 "expected dim SGR for {status:?}, got: {rendered:?}"
@@ -270,27 +277,27 @@ mod tests {
         let cases = [
             (
                 RunStatus::Succeeded {
-                    reason: fabro_types::status::SuccessReason::Completed,
+                    reason: SuccessReason::Completed,
                 },
                 "\x1b[32m",
             ),
             (
                 RunStatus::Failed {
-                    reason: fabro_types::status::FailureReason::WorkflowError,
+                    reason: FailureReason::WorkflowError,
                 },
                 "\x1b[31m",
             ),
             (RunStatus::Running, "\x1b[36m"),
             (
                 RunStatus::Blocked {
-                    blocked_reason: fabro_types::status::BlockedReason::HumanInputRequired,
+                    blocked_reason: BlockedReason::HumanInputRequired,
                 },
                 "\x1b[33m",
             ),
             (RunStatus::Paused { prior_block: None }, "\x1b[35m"),
         ];
         for (status, expected_fg) in cases {
-            let rendered = render_cell(status_cell(status, true));
+            let rendered = render_cell(status_cell(status, true), true);
             assert!(
                 rendered.contains("\x1b[1m"),
                 "expected bold SGR for {status:?}, got: {rendered:?}"
@@ -308,7 +315,7 @@ mod tests {
 
     #[test]
     fn status_cell_emits_no_escapes_when_color_disabled() {
-        let rendered = render_cell(status_cell(RunStatus::Dead, false));
+        let rendered = render_cell(status_cell(RunStatus::Dead, false), false);
         assert!(
             !rendered.contains("\x1b["),
             "expected no ANSI escapes with use_color=false, got: {rendered:?}"

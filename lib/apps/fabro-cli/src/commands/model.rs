@@ -128,14 +128,8 @@ fn model_row(model: &Model, use_color: bool) -> Vec<CellStruct> {
     );
     vec![
         model.id.as_str().cell().bold(use_color),
-        model
-            .provider
-            .as_str()
-            .cell()
-            .foreground_color(color_if(use_color, Color::Ansi256(8))),
-        aliases
-            .cell()
-            .foreground_color(color_if(use_color, Color::Ansi256(8))),
+        model.provider.as_str().cell().dimmed(use_color),
+        aliases.cell().dimmed(use_color),
         format_context_window(model.limits.context_window)
             .cell()
             .justify(Justify::Right),
@@ -652,6 +646,46 @@ mod tests {
     #[test]
     fn format_speed_some() {
         assert_eq!(format_speed(Some(85.5)), "85 tok/s");
+    }
+
+    fn render_row(row: Vec<CellStruct>, use_color: bool) -> String {
+        let cc = if use_color {
+            cli_table::ColorChoice::Always
+        } else {
+            cli_table::ColorChoice::Never
+        };
+        vec![row]
+            .table()
+            .color_choice(cc)
+            .display()
+            .unwrap()
+            .to_string()
+    }
+
+    #[test]
+    fn model_row_dims_provider_and_aliases_instead_of_ansi256() {
+        let model: Model =
+            serde_json::from_value(test_model_json("test-model", ProviderId::anthropic())).unwrap();
+        let rendered = render_row(model_row(&model, true), true);
+        assert!(
+            rendered.contains("\x1b[2m"),
+            "expected dim SGR, got: {rendered:?}"
+        );
+        assert!(
+            !rendered.contains("\x1b[38;5;8m"),
+            "expected no Ansi256(8) SGR, got: {rendered:?}"
+        );
+    }
+
+    #[test]
+    fn model_row_no_color_has_no_escape_bytes() {
+        let model: Model =
+            serde_json::from_value(test_model_json("test-model", ProviderId::anthropic())).unwrap();
+        let rendered = render_row(model_row(&model, false), false);
+        assert!(
+            !rendered.contains("\x1b["),
+            "expected no ANSI escape bytes, got: {rendered:?}"
+        );
     }
 
     #[tokio::test]

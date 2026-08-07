@@ -88,9 +88,7 @@ pub(crate) fn print_timeline(entries: &[TimelineEntryJson], styles: &Styles, pri
                     .cell()
                     .foreground_color(color_if(use_color, Color::Cyan)),
                 entry.node_name.clone().cell(),
-                detail_str
-                    .cell()
-                    .foreground_color(color_if(use_color, Color::Ansi256(8))),
+                detail_str.cell().dimmed(use_color),
             ]
         })
         .collect();
@@ -114,5 +112,46 @@ pub(crate) fn print_timeline(entries: &[TimelineEntryJson], styles: &Styles, pri
         for line in display.to_string().lines() {
             eprintln!("{}", line.trim_end());
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn render_cell(cell: CellStruct, use_color: bool) -> String {
+        let color_choice = if use_color {
+            cli_table::ColorChoice::Always
+        } else {
+            cli_table::ColorChoice::Never
+        };
+        vec![vec![cell]]
+            .table()
+            .color_choice(color_choice)
+            .display()
+            .unwrap()
+            .to_string()
+    }
+
+    #[test]
+    fn detail_cell_dims_instead_of_ansi256() {
+        let rendered = render_cell("(visit 2, loop)".cell().dimmed(true), true);
+        assert!(
+            rendered.contains("\x1b[2m"),
+            "expected dim SGR, got: {rendered:?}"
+        );
+        assert!(
+            !rendered.contains("\x1b[38;5;8m"),
+            "expected no Ansi256(8) SGR, got: {rendered:?}"
+        );
+    }
+
+    #[test]
+    fn detail_cell_no_color_has_no_escape_bytes() {
+        let rendered = render_cell("(visit 2, loop)".cell().dimmed(false), false);
+        assert!(
+            !rendered.contains("\x1b["),
+            "expected no ANSI escape bytes, got: {rendered:?}"
+        );
     }
 }

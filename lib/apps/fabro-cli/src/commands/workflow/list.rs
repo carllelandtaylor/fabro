@@ -146,10 +146,15 @@ fn truncate_str(s: &str, max: usize) -> String {
 mod tests {
     use super::*;
 
-    fn render_cell(cell: CellStruct) -> String {
+    fn render_cell(cell: CellStruct, use_color: bool) -> String {
+        let color_choice = if use_color {
+            cli_table::ColorChoice::Always
+        } else {
+            cli_table::ColorChoice::Never
+        };
         vec![vec![cell]]
             .table()
-            .color_choice(cli_table::ColorChoice::Always)
+            .color_choice(color_choice)
             .display()
             .unwrap()
             .to_string()
@@ -157,7 +162,7 @@ mod tests {
 
     #[test]
     fn goal_cell_dims_instead_of_ansi256() {
-        let rendered = render_cell("goal text".cell().dimmed(true));
+        let rendered = render_cell("goal text".cell().dimmed(true), true);
         assert!(
             rendered.contains("\x1b[2m"),
             "expected dim SGR, got: {rendered:?}"
@@ -170,7 +175,7 @@ mod tests {
 
     #[test]
     fn goal_cell_no_color_has_no_escape_bytes() {
-        let rendered = render_cell("goal text".cell().dimmed(false));
+        let rendered = render_cell("goal text".cell().dimmed(false), false);
         assert!(
             !rendered.contains("\x1b["),
             "expected no ANSI escape bytes, got: {rendered:?}"
