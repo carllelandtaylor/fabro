@@ -1,0 +1,6 @@
+{
+  "outcome": "failed",
+  "notes": null,
+  "failure_reason": "Script failed with exit code: 1\n\n## output\nbase_ref=0abf2297c00a90013a93ae01c6c139b7b85b1b1f\nCLEAN: no staged or unstaged changes; nothing to commit\n",
+  "timestamp": "2026-08-07T01:03:38.080515973Z"
+}
