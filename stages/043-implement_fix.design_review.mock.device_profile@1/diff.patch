@@ -1,0 +1,254 @@
+diff --git a/lib/apps/fabro-cli/src/commands/model.rs b/lib/apps/fabro-cli/src/commands/model.rs
+index dcff19c..72deacd 100644
+--- a/lib/apps/fabro-cli/src/commands/model.rs
++++ b/lib/apps/fabro-cli/src/commands/model.rs
+@@ -128,14 +128,8 @@ fn model_row(model: &Model, use_color: bool) -> Vec<CellStruct> {
+     );
+     vec![
+         model.id.as_str().cell().bold(use_color),
+-        model
+-            .provider
+-            .as_str()
+-            .cell()
+-            .foreground_color(color_if(use_color, Color::Ansi256(8))),
+-        aliases
+-            .cell()
+-            .foreground_color(color_if(use_color, Color::Ansi256(8))),
++        model.provider.as_str().cell().dimmed(use_color),
++        aliases.cell().dimmed(use_color),
+         format_context_window(model.limits.context_window)
+             .cell()
+             .justify(Justify::Right),
+@@ -654,6 +648,46 @@ mod tests {
+         assert_eq!(format_speed(Some(85.5)), "85 tok/s");
+     }
+ 
++    fn render_row(row: Vec<CellStruct>, use_color: bool) -> String {
++        let cc = if use_color {
++            cli_table::ColorChoice::Always
++        } else {
++            cli_table::ColorChoice::Never
++        };
++        vec![row]
++            .table()
++            .color_choice(cc)
++            .display()
++            .unwrap()
++            .to_string()
++    }
++
++    #[test]
++    fn model_row_dims_provider_and_aliases_instead_of_ansi256() {
++        let model: Model =
++            serde_json::from_value(test_model_json("test-model", ProviderId::anthropic())).unwrap();
++        let rendered = render_row(model_row(&model, true), true);
++        assert!(
++            rendered.contains("\x1b[2m"),
++            "expected dim SGR, got: {rendered:?}"
++        );
++        assert!(
++            !rendered.contains("\x1b[38;5;8m"),
++            "expected no Ansi256(8) SGR, got: {rendered:?}"
++        );
++    }
++
++    #[test]
++    fn model_row_no_color_has_no_escape_bytes() {
++        let model: Model =
++            serde_json::from_value(test_model_json("test-model", ProviderId::anthropic())).unwrap();
++        let rendered = render_row(model_row(&model, false), false);
++        assert!(
++            !rendered.contains("\x1b["),
++            "expected no ANSI escape bytes, got: {rendered:?}"
++        );
++    }
++
+     #[tokio::test]
+     async fn test_model_via_server_parses_ok() {
+         let server = httpmock::MockServer::start_async().await;
+diff --git a/lib/apps/fabro-cli/src/commands/run/checkpoints.rs b/lib/apps/fabro-cli/src/commands/run/checkpoints.rs
+index 781694d..bee91aa 100644
+--- a/lib/apps/fabro-cli/src/commands/run/checkpoints.rs
++++ b/lib/apps/fabro-cli/src/commands/run/checkpoints.rs
+@@ -88,9 +88,7 @@ pub(crate) fn print_timeline(entries: &[TimelineEntryJson], styles: &Styles, pri
+                     .cell()
+                     .foreground_color(color_if(use_color, Color::Cyan)),
+                 entry.node_name.clone().cell(),
+-                detail_str
+-                    .cell()
+-                    .foreground_color(color_if(use_color, Color::Ansi256(8))),
++                detail_str.cell().dimmed(use_color),
+             ]
+         })
+         .collect();
+@@ -116,3 +114,44 @@ pub(crate) fn print_timeline(entries: &[TimelineEntryJson], styles: &Styles, pri
+         }
+     }
+ }
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn render_cell(cell: CellStruct, use_color: bool) -> String {
++        let color_choice = if use_color {
++            cli_table::ColorChoice::Always
++        } else {
++            cli_table::ColorChoice::Never
++        };
++        vec![vec![cell]]
++            .table()
++            .color_choice(color_choice)
++            .display()
++            .unwrap()
++            .to_string()
++    }
++
++    #[test]
++    fn detail_cell_dims_instead_of_ansi256() {
++        let rendered = render_cell("(visit 2, loop)".cell().dimmed(true), true);
++        assert!(
++            rendered.contains("\x1b[2m"),
++            "expected dim SGR, got: {rendered:?}"
++        );
++        assert!(
++            !rendered.contains("\x1b[38;5;8m"),
++            "expected no Ansi256(8) SGR, got: {rendered:?}"
++        );
++    }
++
++    #[test]
++    fn detail_cell_no_color_has_no_escape_bytes() {
++        let rendered = render_cell("(visit 2, loop)".cell().dimmed(false), false);
++        assert!(
++            !rendered.contains("\x1b["),
++            "expected no ANSI escape bytes, got: {rendered:?}"
++        );
++    }
++}
+diff --git a/lib/apps/fabro-cli/src/commands/runs/list.rs b/lib/apps/fabro-cli/src/commands/runs/list.rs
+index 7152856..ff2ea19 100644
+--- a/lib/apps/fabro-cli/src/commands/runs/list.rs
++++ b/lib/apps/fabro-cli/src/commands/runs/list.rs
+@@ -203,6 +203,8 @@ fn truncate_str(s: &str, max_len: usize) -> String {
+ 
+ #[cfg(test)]
+ mod tests {
++    use fabro_types::status::{BlockedReason, FailureReason, PendingReason, SuccessReason};
++
+     use super::*;
+ 
+     #[test]
+@@ -235,10 +237,15 @@ mod tests {
+         );
+     }
+ 
+-    fn render_cell(cell: CellStruct) -> String {
++    fn render_cell(cell: CellStruct, use_color: bool) -> String {
++        let color_choice = if use_color {
++            cli_table::ColorChoice::Always
++        } else {
++            cli_table::ColorChoice::Never
++        };
+         vec![vec![cell]]
+             .table()
+-            .color_choice(cli_table::ColorChoice::Always)
++            .color_choice(color_choice)
+             .display()
+             .unwrap()
+             .to_string()
+@@ -249,11 +256,11 @@ mod tests {
+         for status in [
+             RunStatus::Submitted,
+             RunStatus::Pending {
+-                reason: fabro_types::status::PendingReason::ApprovalRequired,
++                reason: PendingReason::ApprovalRequired,
+             },
+             RunStatus::Dead,
+         ] {
+-            let rendered = render_cell(status_cell(status, true));
++            let rendered = render_cell(status_cell(status, true), true);
+             assert!(
+                 rendered.contains("\x1b[2m"),
+                 "expected dim SGR for {status:?}, got: {rendered:?}"
+@@ -270,27 +277,27 @@ mod tests {
+         let cases = [
+             (
+                 RunStatus::Succeeded {
+-                    reason: fabro_types::status::SuccessReason::Completed,
++                    reason: SuccessReason::Completed,
+                 },
+                 "\x1b[32m",
+             ),
+             (
+                 RunStatus::Failed {
+-                    reason: fabro_types::status::FailureReason::WorkflowError,
++                    reason: FailureReason::WorkflowError,
+                 },
+                 "\x1b[31m",
+             ),
+             (RunStatus::Running, "\x1b[36m"),
+             (
+                 RunStatus::Blocked {
+-                    blocked_reason: fabro_types::status::BlockedReason::HumanInputRequired,
++                    blocked_reason: BlockedReason::HumanInputRequired,
+                 },
+                 "\x1b[33m",
+             ),
+             (RunStatus::Paused { prior_block: None }, "\x1b[35m"),
+         ];
+         for (status, expected_fg) in cases {
+-            let rendered = render_cell(status_cell(status, true));
++            let rendered = render_cell(status_cell(status, true), true);
+             assert!(
+                 rendered.contains("\x1b[1m"),
+                 "expected bold SGR for {status:?}, got: {rendered:?}"
+@@ -308,7 +315,7 @@ mod tests {
+ 
+     #[test]
+     fn status_cell_emits_no_escapes_when_color_disabled() {
+-        let rendered = render_cell(status_cell(RunStatus::Dead, false));
++        let rendered = render_cell(status_cell(RunStatus::Dead, false), false);
+         assert!(
+             !rendered.contains("\x1b["),
+             "expected no ANSI escapes with use_color=false, got: {rendered:?}"
+diff --git a/lib/apps/fabro-cli/src/commands/workflow/list.rs b/lib/apps/fabro-cli/src/commands/workflow/list.rs
+index ef7443d..1df355b 100644
+--- a/lib/apps/fabro-cli/src/commands/workflow/list.rs
++++ b/lib/apps/fabro-cli/src/commands/workflow/list.rs
+@@ -146,10 +146,15 @@ fn truncate_str(s: &str, max: usize) -> String {
+ mod tests {
+     use super::*;
+ 
+-    fn render_cell(cell: CellStruct) -> String {
++    fn render_cell(cell: CellStruct, use_color: bool) -> String {
++        let color_choice = if use_color {
++            cli_table::ColorChoice::Always
++        } else {
++            cli_table::ColorChoice::Never
++        };
+         vec![vec![cell]]
+             .table()
+-            .color_choice(cli_table::ColorChoice::Always)
++            .color_choice(color_choice)
+             .display()
+             .unwrap()
+             .to_string()
+@@ -157,7 +162,7 @@ mod tests {
+ 
+     #[test]
+     fn goal_cell_dims_instead_of_ansi256() {
+-        let rendered = render_cell("goal text".cell().dimmed(true));
++        let rendered = render_cell("goal text".cell().dimmed(true), true);
+         assert!(
+             rendered.contains("\x1b[2m"),
+             "expected dim SGR, got: {rendered:?}"
+@@ -170,7 +175,7 @@ mod tests {
+ 
+     #[test]
+     fn goal_cell_no_color_has_no_escape_bytes() {
+-        let rendered = render_cell("goal text".cell().dimmed(false));
++        let rendered = render_cell("goal text".cell().dimmed(false), false);
+         assert!(
+             !rendered.contains("\x1b["),
+             "expected no ANSI escape bytes, got: {rendered:?}"
