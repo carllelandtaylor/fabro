@@ -1,0 +1,9 @@
+This request asks me to create a per-feature `design-mock.html` working copy, but two things block that:
+
+1. **No destination directory was actually supplied.** The instructions say the calling context provides `<dest-dir>`, but the literal placeholder text `<dest-dir>` appears unresolved in the prompt — there's no real path to copy into. I won't fabricate one.
+
+2. **This task already determined a design mock doesn't apply.** The pipeline's own `implement_fix.design_review.detect_spec`, `a_enumerate`, and `a_mock_brief` stages already ran and concluded (correctly) that this bug fix is a terminal ANSI-escape-sequence fix in `fabro-cli` (`Color::Ansi256(8)` → `.dimmed()`), touching only `lib/apps/fabro-cli/src/commands/**` and doc/plan files. There's no rendered UI screen, no `apps/fabro-web` change, and nothing for a design mock to represent. Creating a `design-mock.html` for this change would produce an artifact with no real content — an empty/fabricated mock for a CLI-only fix.
+
+I'm not going to create the working copy here, since doing so would either require guessing a destination path or producing a meaningless mock for a task that has no UI surface. If this step is meant to run unconditionally regardless of the design-review path outcome, that looks like a pipeline routing issue — the `path_gate`/`a_mock_brief` stages already exited to the no-mock branch for exactly this reason.
+
+Current state of the actual bug fix (for context): Step 1 (`runs/list.rs`) and Step 2 (`workflow/list.rs`) are implemented but validation is currently failing — a test-helper bug (`ColorChoice::Always` hardcoded instead of branching on `use_color`) plus a clippy `absolute_paths` violation, and Steps 3 (`run/checkpoints.rs`) and 4 (`model.rs`) haven't been implemented yet. Let me know if you'd like me to continue driving the actual fix forward instead.
