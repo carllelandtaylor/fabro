@@ -1,0 +1,159 @@
+diff --git a/lib/apps/fabro-cli/src/commands/runs/list.rs b/lib/apps/fabro-cli/src/commands/runs/list.rs
+index e2e9645..7152856 100644
+--- a/lib/apps/fabro-cli/src/commands/runs/list.rs
++++ b/lib/apps/fabro-cli/src/commands/runs/list.rs
+@@ -122,30 +122,20 @@ pub(crate) async fn list_command(
+                 .map_or_else(|| "-".to_string(), |p| tilde_path(Path::new(p)));
+             let run_id = run.run_id().to_string();
+ 
+-            let mut row = vec![
+-                short_run_id(&run_id)
+-                    .cell()
+-                    .foreground_color(color_if(use_color, Color::Ansi256(8))),
+-            ];
++            let mut row = vec![short_run_id(&run_id).cell().dimmed(use_color)];
+             if show_parent_column {
+                 let parent_display = run.parent_id().map_or_else(
+                     || "-".to_string(),
+                     |parent_id| short_run_id(&parent_id.to_string()).to_string(),
+                 );
+-                row.push(
+-                    parent_display
+-                        .cell()
+-                        .foreground_color(color_if(use_color, Color::Ansi256(8))),
+-                );
++                row.push(parent_display.cell().dimmed(use_color));
+             }
+             row.extend([
+                 run.workflow_display_name().cell(),
+                 status_cell(run.status(), use_color),
+                 dir_display.cell(),
+                 duration_display.cell(),
+-                truncate_goal(&run.goal(), 50)
+-                    .cell()
+-                    .foreground_color(color_if(use_color, Color::Ansi256(8))),
++                truncate_goal(&run.goal(), 50).cell().dimmed(use_color),
+             ]);
+             row
+         })
+@@ -170,19 +160,24 @@ pub(crate) async fn list_command(
+ 
+ fn status_cell(status: RunStatus, use_color: bool) -> CellStruct {
+     let text = run_status_kind(status);
+-    let color = match status {
+-        RunStatus::Succeeded { .. } => Some(Color::Green),
+-        RunStatus::Failed { .. } => Some(Color::Red),
+-        RunStatus::Running | RunStatus::Starting | RunStatus::Runnable => Some(Color::Cyan),
+-        RunStatus::Submitted | RunStatus::Pending { .. } | RunStatus::Dead => {
+-            Some(Color::Ansi256(8))
++    let (color, is_dim) = match status {
++        RunStatus::Succeeded { .. } => (Some(Color::Green), false),
++        RunStatus::Failed { .. } => (Some(Color::Red), false),
++        RunStatus::Running | RunStatus::Starting | RunStatus::Runnable => {
++            (Some(Color::Cyan), false)
+         }
+-        RunStatus::Blocked { .. } | RunStatus::Removing => Some(Color::Yellow),
+-        RunStatus::Paused { .. } => Some(Color::Magenta),
++        RunStatus::Submitted | RunStatus::Pending { .. } | RunStatus::Dead => (None, true),
++        RunStatus::Blocked { .. } | RunStatus::Removing => (Some(Color::Yellow), false),
++        RunStatus::Paused { .. } => (Some(Color::Magenta), false),
+     };
+-    text.cell()
+-        .bold(use_color && color != Some(Color::Ansi256(8)))
+-        .foreground_color(color_if(use_color, color.unwrap_or(Color::Ansi256(8))))
++    let cell = text
++        .cell()
++        .bold(use_color && !is_dim)
++        .dimmed(use_color && is_dim);
++    match color {
++        Some(c) => cell.foreground_color(color_if(use_color, c)),
++        None => cell,
++    }
+ }
+ 
+ fn parse_label_filters(label_args: &[String]) -> Vec<(String, String)> {
+@@ -239,4 +234,84 @@ mod tests {
+             "A long ..."
+         );
+     }
++
++    fn render_cell(cell: CellStruct) -> String {
++        vec![vec![cell]]
++            .table()
++            .color_choice(cli_table::ColorChoice::Always)
++            .display()
++            .unwrap()
++            .to_string()
++    }
++
++    #[test]
++    fn status_cell_dims_submitted_pending_dead_instead_of_ansi256() {
++        for status in [
++            RunStatus::Submitted,
++            RunStatus::Pending {
++                reason: fabro_types::status::PendingReason::ApprovalRequired,
++            },
++            RunStatus::Dead,
++        ] {
++            let rendered = render_cell(status_cell(status, true));
++            assert!(
++                rendered.contains("\x1b[2m"),
++                "expected dim SGR for {status:?}, got: {rendered:?}"
++            );
++            assert!(
++                !rendered.contains("\x1b[38;5;8m"),
++                "expected no Ansi256(8) SGR for {status:?}, got: {rendered:?}"
++            );
++        }
++    }
++
++    #[test]
++    fn status_cell_keeps_bold_color_for_non_dim_statuses() {
++        let cases = [
++            (
++                RunStatus::Succeeded {
++                    reason: fabro_types::status::SuccessReason::Completed,
++                },
++                "\x1b[32m",
++            ),
++            (
++                RunStatus::Failed {
++                    reason: fabro_types::status::FailureReason::WorkflowError,
++                },
++                "\x1b[31m",
++            ),
++            (RunStatus::Running, "\x1b[36m"),
++            (
++                RunStatus::Blocked {
++                    blocked_reason: fabro_types::status::BlockedReason::HumanInputRequired,
++                },
++                "\x1b[33m",
++            ),
++            (RunStatus::Paused { prior_block: None }, "\x1b[35m"),
++        ];
++        for (status, expected_fg) in cases {
++            let rendered = render_cell(status_cell(status, true));
++            assert!(
++                rendered.contains("\x1b[1m"),
++                "expected bold SGR for {status:?}, got: {rendered:?}"
++            );
++            assert!(
++                rendered.contains(expected_fg),
++                "expected {expected_fg:?} SGR for {status:?}, got: {rendered:?}"
++            );
++            assert!(
++                !rendered.contains("\x1b[2m"),
++                "expected no dim SGR for {status:?}, got: {rendered:?}"
++            );
++        }
++    }
++
++    #[test]
++    fn status_cell_emits_no_escapes_when_color_disabled() {
++        let rendered = render_cell(status_cell(RunStatus::Dead, false));
++        assert!(
++            !rendered.contains("\x1b["),
++            "expected no ANSI escapes with use_color=false, got: {rendered:?}"
++        );
++    }
+ }
